@@ -28,8 +28,9 @@ func main() {
 	sql := `
 	CREATE TABLE IF NOT EXISTS incoming_raw (
 		id SERIAL PRIMARY KEY,
-		node_id TEXT NOT NULL,
+		node TEXT NOT NULL,
 		type TEXT NOT NULL,
+		depth INT NOT NULL, 
 		value DOUBLE PRECISION NOT NULL,
 		timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`

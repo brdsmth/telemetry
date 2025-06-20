@@ -49,7 +49,7 @@ void setup() {
 
     if (wifi_manager::isConnected()) {
         Serial.println("IP: " + wifi_manager::getLocalIP());
-		String payload = "{\"node_id\":\"sensor-002\",\"timestamp\":0,\"value\":42,\"type\":\"soil_moisture\"}";
+		String payload = "{\"node\":\"sensor-002\", \"depth\":10, \"timestamp\":0,\"value\":42,\"type\":\"soil_moisture\"}";
         post_client::sendJsonPost(SERVER_URL, payload);
     } else {
         Serial.println("Falling back to SIM...");
