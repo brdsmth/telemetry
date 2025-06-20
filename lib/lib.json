@@ -1,0 +1,11 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "description": "Common logging and memory tools for ESP32",
+  "authors": [
+    {
+      "name": "brdsmth",
+      "email": "brsmith110@gmail.com"
+    }
+  ]
+}
