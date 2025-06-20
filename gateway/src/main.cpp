@@ -2,83 +2,66 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
-#include <Preferences.h>
+extern "C" {
+  #include "esp_wifi.h"
+}
 
 // === Project includes ===
 #include "logger.h"
-#include "memory.h"
-#include "wifi_manager.h"
-#include "post_client.h"
 
-// === Configuration ===
-#define FIRMWARE_VERSION "0.0.1"
-#define SERVER_URL "http://192.168.0.224:8080/ingest"
-#define REPORT_INTERVAL_MS 5000
+// Structure for sensor data
+typedef struct {
+    int node;  
+    int depth;
+    int value;
+} sensor_message_t;
 
-// === Globals ===
-Preferences preferences;
-const char* device_id = "sensor-001";
-int bootCount = 0;
-
-void setup() {
-    Serial.begin(115200);
-    delay(5000);
-
-    logln("Starting up...");
-    logln("\n================================================\n");
-
-    logln("Device ID: " + String(device_id));
-    logln("Firmware version: " + String(FIRMWARE_VERSION));
-
-    WiFi.mode(WIFI_STA);
-    logln("MAC Address: " + WiFi.macAddress());
-
-    Serial.println();
+// Callback when data is received
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+    char macStr[18];
+    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
     
-    preferences.begin(device_id, false);
-    
-    bootCount = preferences.getInt("bootCount", 0);
-    bootCount++;
-    
-    preferences.putInt("bootCount", bootCount);
-    
-    logkv("Boot count", bootCount);
-    printMemoryStats();
-    logln("\n================================================\n");
+    logln("📡 Received data from: " + String(macStr));
 
-    wifi_manager::connectToBestNetwork();
-
-    if (wifi_manager::isConnected()) {
-        Serial.println("IP: " + wifi_manager::getLocalIP());
-		String payload = "{\"node\":\"sensor-002\", \"firmware\":\"" + String(FIRMWARE_VERSION) + "\", \"depth\":10, \"timestamp\":0,\"value\":42,\"type\":\"soil_moisture\"}";
-        post_client::sendJsonPost(SERVER_URL, payload);
-    } else {
-        Serial.println("Falling back to SIM...");
+    if (data_len == sizeof(sensor_message_t)) {
+        sensor_message_t* message = (sensor_message_t*)data;
+        logln("📦 Data: node=" + String(message->node) + 
+              ", depth=" + String(message->depth) + 
+              ", value=" + String(message->value));
     }
 }
 
-void loop() {
-    logln("Looping... " + String(device_id));
+void setup() {
+    Serial.begin(115200);
     delay(1000);
 
+    logln("\n=== Gateway Starting ===");
     
-    // Simulate an incoming sensor reading
-    int sensor_id = random(100, 1000);
-    int depth = random(1, 11) * 10;
-    int value = random(0, 1000);
-    String payload = "{\"node\":\"sensor-" + String(sensor_id) + "\", \"firmware\":\"" + String(FIRMWARE_VERSION) + "\", \"depth\":" + String(depth) + ", \"timestamp\":0,\"value\":" + String(value) + ",\"type\":\"soil_moisture\"}";
-    
-    // Calculate payload size
-    int payloadSize = payload.length();
-    logln("Payload size: " + String(payloadSize) + " bytes");
-    logln("Payload: " + payload);
+    // Initialize WiFi in Station mode
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    delay(100);
 
-    if (wifi_manager::isConnected()) {
-        post_client::sendJsonPost(SERVER_URL, payload);\
-        logln("\n================================================\n");
-    } else {
-        Serial.println("Falling back to SIM...");
+    // Initialize ESP-NOW
+    if (esp_now_init() != ESP_OK) {
+        logln("❌ ESP-NOW init failed");
+        return;
     }
+    logln("✅ ESP-NOW initialized");
 
-    delay(REPORT_INTERVAL_MS);
+    // Set channel
+    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    logln("📻 Set to channel 1");
+
+    // Register callback
+    esp_now_register_recv_cb(OnDataRecv);
+    
+    logln("🔍 MAC Address: " + WiFi.macAddress());
+    logln("✨ Gateway ready!");
+}
+
+void loop() {
+    // Just keep the ESP32 running
+    delay(10);
 } 
