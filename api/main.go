@@ -39,7 +39,7 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	ts := time.Unix(payload.Timestamp, 0)
 
 	_, err := db.Exec(context.Background(),
-		`INSERT INTO sensors (node_id, type, value, timestamp) VALUES ($1, $2, $3, $4)`,
+		`INSERT INTO incoming_raw (node_id, type, value, timestamp) VALUES ($1, $2, $3, $4)`,
 		payload.NodeID, payload.Type, payload.Value, ts)
 	if err != nil {
 		log.Printf("DB insert error: %v", err)

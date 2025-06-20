@@ -26,7 +26,7 @@ func main() {
 	defer conn.Close(context.Background())
 
 	sql := `
-	CREATE TABLE IF NOT EXISTS sensors (
+	CREATE TABLE IF NOT EXISTS incoming_raw (
 		id SERIAL PRIMARY KEY,
 		node_id TEXT NOT NULL,
 		type TEXT NOT NULL,
