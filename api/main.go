@@ -15,6 +15,7 @@ import (
 type SensorPayload struct {
 	Node      string  `json:"node"`
 	Depth     int     `json:"depth"`
+	Firmware  string  `json:"firmware"`
 	Timestamp int64   `json:"timestamp"`
 	Value     float64 `json:"value"`
 	Type      string  `json:"type"`
@@ -40,8 +41,8 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	ts := time.Unix(payload.Timestamp, 0)
 
 	_, err := db.Exec(context.Background(),
-		`INSERT INTO incoming_raw (node, type, depth, value, timestamp) VALUES ($1, $2, $3, $4, $5)`,
-		payload.Node, payload.Type, payload.Depth, payload.Value, ts)
+		`INSERT INTO incoming_raw (node, type, depth, firmware, value, timestamp) VALUES ($1, $2, $3, $4, $5, $6)`,
+		payload.Node, payload.Type, payload.Depth, payload.Firmware, payload.Value, ts)
 	if err != nil {
 		log.Printf("DB insert error: %v", err)
 		http.Error(w, "db error", http.StatusInternalServerError)

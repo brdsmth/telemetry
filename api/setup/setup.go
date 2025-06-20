@@ -31,6 +31,7 @@ func main() {
 		node TEXT NOT NULL,
 		type TEXT NOT NULL,
 		depth INT NOT NULL, 
+		firmware TEXT NOT NULL,
 		value DOUBLE PRECISION NOT NULL,
 		timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`

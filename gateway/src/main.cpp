@@ -50,7 +50,7 @@ void setup() {
 
     if (wifi_manager::isConnected()) {
         Serial.println("IP: " + wifi_manager::getLocalIP());
-		String payload = "{\"node\":\"sensor-002\", \"depth\":10, \"timestamp\":0,\"value\":42,\"type\":\"soil_moisture\"}";
+		String payload = "{\"node\":\"sensor-002\", \"firmware\":\"" + String(FIRMWARE_VERSION) + "\", \"depth\":10, \"timestamp\":0,\"value\":42,\"type\":\"soil_moisture\"}";
         post_client::sendJsonPost(SERVER_URL, payload);
     } else {
         Serial.println("Falling back to SIM...");
@@ -66,7 +66,7 @@ void loop() {
     int sensor_id = random(100, 1000);
     int depth = random(1, 11) * 10;
     int value = random(0, 1000);
-    String payload = "{\"node\":\"sensor-" + String(sensor_id) + "\", \"depth\":" + String(depth) + ", \"timestamp\":0,\"value\":" + String(value) + ",\"type\":\"soil_moisture\"}";
+    String payload = "{\"node\":\"sensor-" + String(sensor_id) + "\", \"firmware\":\"" + String(FIRMWARE_VERSION) + "\", \"depth\":" + String(depth) + ", \"timestamp\":0,\"value\":" + String(value) + ",\"type\":\"soil_moisture\"}";
     
     // Calculate payload size
     int payloadSize = payload.length();
