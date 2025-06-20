@@ -1,0 +1,35 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/*
+tmp/*
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+*.swp
+hermione
+
+# Local environment files
+.go-version
+
+# git files
+.gitconfig
+
+# env files
+.envrc
+
+# docker compose overrides
+docker-compose.override.yaml
+
+# ide/editors/machine specific stuff
+.vscode
+.idea
+.DS_Store
+**debug_bin**

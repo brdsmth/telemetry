@@ -2,6 +2,7 @@ APP_NAME := ingester
 BUILD_DIR := build
 
 .PHONY: all run build clean
+.PHONY: setup
 
 all: build
 
@@ -17,3 +18,7 @@ build:
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf $(BUILD_DIR)
+
+setup:
+	@echo "🔧 Setting up $(APP_NAME)..."
+	go run setup/setup.go

@@ -1,0 +1,9 @@
+.env*
+**/node_modules/**
+
+.DS_Store
+.idea
+.vscode
+.cursorrules
+.cursorignore
+.cursorignore 

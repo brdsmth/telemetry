@@ -1,19 +1,25 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 )
 
-// SensorPayload is the expected structure of incoming sensor data
 type SensorPayload struct {
-	NodeID    string  `json:"node_id"`   // Unique ID per ESP32 node
-	Timestamp int64   `json:"timestamp"` // UNIX time from device or gateway
-	Value     float64 `json:"value"`     // Sensor reading
-	Type      string  `json:"type"`      // e.g. "soil_moisture", "temperature"
+	NodeID    string  `json:"node_id"`
+	Timestamp int64   `json:"timestamp"`
+	Value     float64 `json:"value"`
+	Type      string  `json:"type"`
 }
+
+var db *pgx.Conn
 
 func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -27,19 +33,42 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fallback if device didn’t send timestamp
 	if payload.Timestamp == 0 {
 		payload.Timestamp = time.Now().Unix()
 	}
+	ts := time.Unix(payload.Timestamp, 0)
 
-	log.Printf("[INGEST] Node=%s Type=%s Value=%.2f Time=%d",
-		payload.NodeID, payload.Type, payload.Value, payload.Timestamp)
+	_, err := db.Exec(context.Background(),
+		`INSERT INTO sensors (node_id, type, value, timestamp) VALUES ($1, $2, $3, $4)`,
+		payload.NodeID, payload.Type, payload.Value, ts)
+	if err != nil {
+		log.Printf("DB insert error: %v", err)
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
 
+	log.Printf("[DB] Saved: %+v", payload)
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("ok"))
 }
 
 func main() {
+
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️ .env file not found, using environment variables")
+	}
+
+	var err error
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL not set")
+	}
+	db, err = pgx.Connect(context.Background(), dbURL)
+	if err != nil {
+		log.Fatalf("Unable to connect to DB: %v", err)
+	}
+	defer db.Close(context.Background())
+
 	http.HandleFunc("/ingest", ingestHandler)
 
 	port := "8080"
