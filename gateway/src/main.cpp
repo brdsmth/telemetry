@@ -13,10 +13,11 @@
 // === Configuration ===
 #define FIRMWARE_VERSION "0.0.1"
 #define SERVER_URL "http://192.168.0.224:8080/ingest"
+#define REPORT_INTERVAL_MS 5000
 
 // === Globals ===
 Preferences preferences;
-const char* device_id = "s1";
+const char* device_id = "sensor-001";
 int bootCount = 0;
 
 void setup() {
@@ -57,6 +58,27 @@ void setup() {
 }
 
 void loop() {
-    logln("Hello World from " + String(device_id));
-    delay(5000);
+    logln("Looping... " + String(device_id));
+    delay(1000);
+
+    
+    // Simulate an incoming sensor reading
+    int sensor_id = random(100, 1000);
+    int depth = random(1, 11) * 10;
+    int value = random(0, 1000);
+    String payload = "{\"node\":\"sensor-" + String(sensor_id) + "\", \"depth\":" + String(depth) + ", \"timestamp\":0,\"value\":" + String(value) + ",\"type\":\"soil_moisture\"}";
+    
+    // Calculate payload size
+    int payloadSize = payload.length();
+    logln("Payload size: " + String(payloadSize) + " bytes");
+    logln("Payload: " + payload);
+
+    if (wifi_manager::isConnected()) {
+        post_client::sendJsonPost(SERVER_URL, payload);\
+        logln("\n================================================\n");
+    } else {
+        Serial.println("Falling back to SIM...");
+    }
+
+    delay(REPORT_INTERVAL_MS);
 } 
