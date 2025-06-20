@@ -1,4 +1,4 @@
-APP_NAME := ingester
+APP_NAME := api
 BUILD_DIR := build
 
 .PHONY: all run build clean

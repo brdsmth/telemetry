@@ -1,4 +1,4 @@
-# Ingester 
+# API
 
 A lightweight HTTP server written in Go to ingest JSON sensor data from remote ESP32 + SIM7600 nodes and store it in PostgreSQL.
 
