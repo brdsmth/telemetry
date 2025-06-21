@@ -8,6 +8,7 @@ extern "C" {
 
 // === Project includes ===
 #include "logger.h"
+#include "espnow_utils.h"
 
 // Structure for sensor data
 typedef struct {
@@ -18,7 +19,7 @@ typedef struct {
 
 // Callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-    logln("📤 Send status: " + String(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Failed"));
+    logln("-----> 📤 Send status: " + String(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Failed"));
 }
 
 void setup() {
@@ -26,48 +27,26 @@ void setup() {
     delay(1000);
 
     logln("\n=== Sensor Starting ===");
-    
-    // Initialize WiFi in Station mode
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-    delay(100);
 
-    // Initialize ESP-NOW
-    if (esp_now_init() != ESP_OK) {
-        logln("❌ ESP-NOW init failed");
-        return;
-    }
-    logln("✅ ESP-NOW initialized");
+    initializeWiFiStationMode();
 
-    // Set channel
-    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-    logln("📻 Set to channel 1");
+    if (!initializeESPNOW()) return;
 
-    // Register callback
-    esp_now_register_send_cb(OnDataSent);
+    const uint8_t channel = 1;
+    configureWiFiChannel(channel);
+    registerSendCallback(OnDataSent);
 
-    // Add gateway as peer
-    esp_now_peer_info_t peerInfo = {};
-    // Gateway MAC from serial output
-    uint8_t gatewayMac[] = {0xEC, 0xE3, 0x34, 0xC0, 0x2F, 0xD8};  // Your gateway's actual MAC
-    memcpy(peerInfo.peer_addr, gatewayMac, 6);
-    peerInfo.channel = 1;
-    peerInfo.encrypt = false;
+    const uint8_t gatewayMac[] = {0xEC, 0xE3, 0x34, 0xC0, 0x2F, 0xD8};  // your gateway
+    if (!addPeer(gatewayMac, channel)) return;
 
-    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-        logln("❌ Failed to add peer");
-        return;
-    }
-    logln("✅ Added peer");
-    
-    logln("🔍 MAC Address: " + WiFi.macAddress());
-    logln("✨ Sensor ready!");
+    logln("-----> 🔍 MAC Address: " + WiFi.macAddress());
+    logln("-----> ✨ Sensor ready! ✨");
 }
 
 void loop() {
     // Create test data
     sensor_message_t sensorData = {
-        .node = 1,
+        .node = random(1000, 1010),
         .depth = 20,
         .value = random(0, 1000)
     };

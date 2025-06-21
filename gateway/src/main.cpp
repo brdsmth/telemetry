@@ -2,12 +2,16 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <vector>
 extern "C" {
   #include "esp_wifi.h"
 }
 
 // === Project includes ===
 #include "logger.h"
+#include "post_client.h"
+#include "espnow_utils.h"
+#include "wifi_manager.h"
 
 // Structure for sensor data
 typedef struct {
@@ -15,6 +19,13 @@ typedef struct {
     int depth;
     int value;
 } sensor_message_t;
+
+// Flushing messages to server
+std::vector<String> messageQueue;
+unsigned long lastFlushTime = 0;
+const unsigned long FLUSH_INTERVAL_MS = 60000;  // every 60s
+const size_t MAX_QUEUE_SIZE = 5;
+
 
 // Callback when data is received
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
@@ -28,8 +39,76 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
         sensor_message_t* message = (sensor_message_t*)data;
         logln("📦 Data: node=" + String(message->node) + 
               ", depth=" + String(message->depth) + 
-              ", value=" + String(message->value));
+              ", value=" + String(message->value) +
+              ", timestamp=" + String(time(nullptr)));
+
+        // Convert to JSON
+        String json = "{";
+        json += "\"node\":\"" + String(message->node) + "\",";  // ✅ now a string
+        json += "\"depth\":" + String(message->depth) + ",";
+        json += "\"firmware\":\"0.0.1\",";
+        json += "\"timestamp\":" + String(time(nullptr)) + ",";
+        json += "\"value\":" + String(message->value) + ",";
+        json += "\"type\":\"soil\"";
+        json += "}";
+
+        messageQueue.push_back(json);
+        logln("🗃️ Queued message. Queue size: " + String(messageQueue.size()));
+    } else {
+        logln("⚠️ Received unexpected payload size");
     }
+}
+
+
+// Flush queue to server 
+void flushQueueToServer() {
+    if (messageQueue.empty()) return;
+
+    logln("🚪 Flushing " + String(messageQueue.size()) + " messages to server...");
+
+    // Shutdown ESP-NOW
+    esp_now_deinit();
+    delay(100);
+
+    // Connect to WiFi
+    WiFi.mode(WIFI_STA);
+    // WiFi.begin("YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD");
+    wifi_manager::connectToBestNetwork();
+
+    int retries = 0;
+    while (WiFi.status() != WL_CONNECTED && retries < 10) {
+        delay(500);
+        Serial.print(".");
+        retries++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        logln("\n🌐 Connected to WiFi");
+
+        for (const auto& msg : messageQueue) {
+            post_client::sendJsonPost("http://192.168.0.224:8080/ingest", msg);
+        }
+
+        messageQueue.clear();
+        logln("✅ Flushed queue");
+    } else {
+        logln("\n❌ WiFi connection failed — messages retained");
+    }
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(1000); // ensure full shutdown
+
+    // Reinit ESP-NOW
+    initializeWiFiStationMode();
+
+    if (!initializeESPNOW()) return;
+
+    const uint8_t channel = 1;
+    configureWiFiChannel(channel);
+    registerRecvCallback(OnDataRecv);
+
+    logln("📡 ESP-NOW reinitialized");
 }
 
 void setup() {
@@ -38,30 +117,34 @@ void setup() {
 
     logln("\n=== Gateway Starting ===");
     
-    // Initialize WiFi in Station mode
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
-    delay(100);
+    initializeWiFiStationMode();
 
-    // Initialize ESP-NOW
-    if (esp_now_init() != ESP_OK) {
-        logln("❌ ESP-NOW init failed");
-        return;
-    }
-    logln("✅ ESP-NOW initialized");
+    if (!initializeESPNOW()) return;
 
-    // Set channel
-    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-    logln("📻 Set to channel 1");
-
-    // Register callback
-    esp_now_register_recv_cb(OnDataRecv);
+    const uint8_t channel = 1;
+    configureWiFiChannel(channel);
+    registerRecvCallback(OnDataRecv);
     
-    logln("🔍 MAC Address: " + WiFi.macAddress());
-    logln("✨ Gateway ready!");
+    logln("-----> 🔍 MAC Address: " + WiFi.macAddress());
+    logln("-----> ✨ Gateway ready!");
+
+    // TODO: Handling time syncing on startup
 }
 
 void loop() {
     // Just keep the ESP32 running
-    delay(10);
+    delay(1000);
+
+    unsigned long now = millis();
+    if (now - lastFlushTime > FLUSH_INTERVAL_MS) {
+        flushQueueToServer();
+        lastFlushTime = now;
+    }
+
+    if (messageQueue.size() >= MAX_QUEUE_SIZE) {
+        logln("⚠️ Queue full. Flushing now...");
+        flushQueueToServer();
+    } else {
+        logln("🗃️ Queue size: " + String(messageQueue.size()));
+    }
 } 
