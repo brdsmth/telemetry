@@ -79,6 +79,12 @@ namespace wifi_manager {
             if (WiFi.status() == WL_CONNECTED) {
                 connected = true;
                 Serial.println("\n✅ Connected! IP: " + WiFi.localIP().toString());
+                configTime(0, 0, "pool.ntp.org");
+                while (time(nullptr) < 100000) {
+                    delay(500);
+                    Serial.print(".");
+                }
+                Serial.println("\n⏰ Time synced!");
             } else {
                 Serial.println("\n❌ Connection failed.");
             }
