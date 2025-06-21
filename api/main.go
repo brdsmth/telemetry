@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -31,6 +32,7 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 
 	var payload SensorPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Printf("invalid JSON: %v", err)
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -71,6 +73,11 @@ func main() {
 	}
 	defer db.Close(context.Background())
 
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("---> /")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello, World!"))
+	})
 	http.HandleFunc("/ingest", ingestHandler)
 
 	port := "8080"

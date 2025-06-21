@@ -1,4 +1,4 @@
-module ingest-server
+module api
 
 go 1.24.4
 
