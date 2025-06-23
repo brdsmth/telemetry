@@ -12,13 +12,11 @@ extern "C" {
 
 // === Sensor configuration ===
 enum SensorDepth {
-    DEPTH_TOP = 10,
-    DEPTH_MID = 20,
     DEPTH_BOT = 30,
 };
 
-const int NUM_SENSORS = 3;
-const int sensor_pins[NUM_SENSORS] = {34, 35, 36}; // Adjust based on your wiring
+const int NUM_SENSORS = 1;
+const int sensor_pins[NUM_SENSORS] = {34}; // Adjust based on your wiring
 
 // === Structure for sensor data ===
 typedef struct {
@@ -35,17 +33,10 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 float readSensorAtDepth(int adc_pin, SensorDepth depth) {
     int adc_value = analogRead(adc_pin);
     float voltage = adc_value * (3.3 / 4095.0);
-    float r_sensor = (3300.0 / voltage - 1) * 10000.0;
+    float r_sensor = (3.3 / voltage - 1) * 10000.0;
     float cb = 0.118 * r_sensor + 0.004 * sqrt(r_sensor);
     float kPa = cb;
-
-    if (adc_value < 1000 || adc_value > 4000) {
-    logln("⚠️  Likely floating pin or bad connection.");
-    }
-    logln("\n-----> ADC[" + String(depth) + "] = " + String(adc_value));
-    logln("         V: " + String(voltage) + " V");
-    logln("         R: " + String(r_sensor) + " Ω");
-    logln("         kPa: " + String(kPa));
+    Serial.printf("ADC [%d]: %d | V: %.2f | Ω: %.2f | kPa: %.2f\n", adc_pin, adc_value, voltage, r_sensor, kPa);
 
     return kPa;
 }
@@ -88,16 +79,32 @@ void setup() {
 }
 
 // === Main loop ===
+
+// 📉 Interpreting kPa Values
+// Wet sensor = lower resistance
+// That pulls more current through the voltage divider
+// Which lowers the voltage at the analog pin
+// Lower voltage = lower ADC reading
+
+// 0–10     Saturated	    Soil is soggy, just rained, no stress on plants
+// 10–30	Ideal Moisture	Moist but not soaked, excellent for growth
+// 40–70	Moderately Dry	Starting to get dry for many crops
+// 70–200	Very Dry	    Roots stressed, irrigation needed
+
+
+// Optimal Wiring
+// 3.3V ──> Fixed 10kΩ Resistor ──> ADC Pin ──> Watermark Sensor ──> GND
+
 void loop() {
-    const SensorDepth depths[NUM_SENSORS] = {DEPTH_TOP, DEPTH_MID, DEPTH_BOT};
+    const SensorDepth depths[NUM_SENSORS] = {DEPTH_BOT};
     const int node_id = 1;
 
     for (int i = 0; i < NUM_SENSORS; i++) {
         float kPa = readSensorAtDepth(sensor_pins[i], depths[i]);
-        sendSensorData(node_id, depths[i], (int)kPa, (const uint8_t[]){0xEC, 0xE3, 0x34, 0xC0, 0x2F, 0xD8});
+        // sendSensorData(node_id, depths[i], (int)kPa, (const uint8_t[]){0xEC, 0xE3, 0x34, 0xC0, 0x2F, 0xD8});
         delay(500); // Small pause between sends
     }
 
-    delay(10000);  // Main loop delay
+    delay(1000);  // Main loop delay
     logln("\n=== Sensor loop complete ===\n");
 }
