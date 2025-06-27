@@ -272,14 +272,266 @@ bool checkNetworkStatus() {
   return true;
 }
 
+// Function to configure APN settings
+bool configureAPN() {
+  Serial.println("Configuring APN settings for Hologram...");
+  
+  // Set PDP context parameters for Hologram APN
+  if (!SentMessage("AT+CGDCONT=1,\"IP\",\"hologram\"", 3000)) {
+    Serial.println("Failed to set PDP context parameters");
+    return false;
+  }
+  
+  // Verify the APN settings
+  SentSerial("AT+CGDCONT?");
+  delay(1000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("PDP Context Settings: " + rev);
+  }
+  
+  return true;
+}
+
+// Function to troubleshoot SIM card detection
+bool troubleshootSIMCard() {
+  Serial.println("Troubleshooting SIM card detection...");
+  
+  // First, try to reset the module
+  Serial.println("Attempting module reset...");
+  SentSerial("AT+CFUN=1,1"); // Reset the module
+  delay(10000); // Wait 10 seconds for reset
+  
+  // Wait for module to be ready
+  Serial.println("Waiting for module to be ready...");
+  int attempts = 0;
+  while (attempts < 20) {
+    SentSerial("AT");
+    delay(1000);
+    if (Serial1.available()) {
+      rev = Serial1.readString();
+      if (rev.indexOf("OK") != -1) {
+        Serial.println("Module is ready!");
+        break;
+      }
+    }
+    attempts++;
+  }
+  
+  if (attempts >= 20) {
+    Serial.println("Module not responding after reset!");
+    return false;
+  }
+  
+  // Check SIM card status multiple times
+  Serial.println("Checking SIM card status...");
+  for (int i = 0; i < 5; i++) {
+    Serial.println("SIM check attempt " + String(i + 1) + "/5");
+    SentSerial("AT+CPIN?");
+    delay(3000);
+    if (Serial1.available()) {
+      rev = Serial1.readString();
+      Serial.println("SIM Status: " + rev);
+      
+      if (rev.indexOf("READY") != -1) {
+        Serial.println("SIM card detected and ready!");
+        return true;
+      }
+      
+      if (rev.indexOf("SIM not inserted") != -1) {
+        Serial.println("SIM not detected - checking hardware...");
+      }
+    }
+    delay(2000);
+  }
+  
+  // Try SIM card detection command
+  Serial.println("Trying SIM card detection command...");
+  SentSerial("AT+CSIM=0");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("CSIM Response: " + rev);
+  }
+  
+  // Check SIM card information
+  Serial.println("Checking SIM card information...");
+  SentSerial("AT+CCID");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("CCID Response: " + rev);
+  }
+  
+  Serial.println("SIM card troubleshooting complete. Please check:");
+  Serial.println("1. SIM card is properly inserted");
+  Serial.println("2. SIM card contacts are clean");
+  Serial.println("3. SIM card holder is secure");
+  Serial.println("4. Power supply is stable");
+  
+  return false;
+}
+
+// Function to initialize SIM card and register to network
+bool initializeSIMAndNetwork() {
+  Serial.println("Initializing SIM card and network registration...");
+  
+  // Check SIM card status
+  Serial.println("Checking SIM card status...");
+  SentSerial("AT+CPIN?");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("SIM Status: " + rev);
+    if (rev.indexOf("READY") == -1) {
+      Serial.println("SIM card not ready! Starting troubleshooting...");
+      if (!troubleshootSIMCard()) {
+        Serial.println("SIM card troubleshooting failed!");
+        return false;
+      }
+    }
+  }
+  
+  // Check current operator
+  Serial.println("Checking current operator...");
+  SentSerial("AT+COPS?");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("Current Operator: " + rev);
+  }
+  
+  // Try to set automatic operator selection
+  Serial.println("Setting automatic operator selection...");
+  if (!SentMessage("AT+COPS=0", 5000)) {
+    Serial.println("Failed to set automatic operator selection");
+  }
+  
+  // Check network registration status
+  Serial.println("Checking network registration...");
+  SentSerial("AT+CREG?");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("Network Registration: " + rev);
+  }
+  
+  // If not registered, try to register
+  int registrationAttempts = 0;
+  const int maxAttempts = 15; // Increased attempts
+  
+  while (registrationAttempts < maxAttempts) {
+    Serial.println("Attempting network registration... (Attempt " + String(registrationAttempts + 1) + "/" + String(maxAttempts) + ")");
+    
+    // Check current registration status
+    SentSerial("AT+CREG?");
+    delay(3000);
+    if (Serial1.available()) {
+      rev = Serial1.readString();
+      Serial.println("Registration Status: " + rev);
+      
+      // Check if registered (0,1 or 0,5 means registered)
+      if (rev.indexOf("+CREG: 0,1") != -1 || rev.indexOf("+CREG: 0,5") != -1) {
+        Serial.println("Successfully registered to network!");
+        return true;
+      }
+      
+      // Check if searching (0,2 means searching)
+      if (rev.indexOf("+CREG: 0,2") != -1) {
+        Serial.println("Searching for network...");
+      }
+      
+      // Check if denied (0,3 means registration denied)
+      if (rev.indexOf("+CREG: 0,3") != -1) {
+        Serial.println("Registration denied by network!");
+        return false;
+      }
+    }
+    
+    // Check signal quality during registration attempts
+    SentSerial("AT+CSQ");
+    delay(1000);
+    if (Serial1.available()) {
+      rev = Serial1.readString();
+      Serial.println("Signal Quality during registration: " + rev);
+    }
+    
+    // Wait before next attempt
+    delay(5000);
+    registrationAttempts++;
+  }
+  
+  Serial.println("Failed to register to network after " + String(maxAttempts) + " attempts");
+  return false;
+}
+
 // Function to activate data connection
 bool activateDataConnection() {
   Serial.println("Activating data connection...");
   
-  // Activate PDP context
-  if (!SentMessage("AT+CGACT=1,1", 5000)) {
-    Serial.println("Failed to activate PDP context");
+  // Initialize SIM and register to network first
+  if (!initializeSIMAndNetwork()) {
+    Serial.println("Failed to initialize SIM or register to network");
     return false;
+  }
+  
+  // Configure APN
+  if (!configureAPN()) {
+    Serial.println("Failed to configure APN");
+    return false;
+  }
+  
+  // Check signal quality
+  Serial.println("Checking signal quality...");
+  SentSerial("AT+CSQ");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("Signal Quality: " + rev);
+  }
+  
+  // Deactivate any existing PDP context first
+  Serial.println("Deactivating any existing PDP context...");
+  SentMessage("AT+CGACT=0,1", 3000);
+  delay(2000);
+  
+  // Check current PDP context status
+  Serial.println("Checking current PDP context status...");
+  SentSerial("AT+CGACT?");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("Current PDP Context: " + rev);
+  }
+  
+  // Activate PDP context with longer timeout
+  Serial.println("Activating PDP context...");
+  if (!SentMessage("AT+CGACT=1,1", 15000)) { // Increased timeout to 15 seconds
+    Serial.println("Failed to activate PDP context");
+    
+    // Try alternative activation method
+    Serial.println("Trying alternative activation method...");
+    SentSerial("AT+CGACT=1,1");
+    delay(5000);
+    
+    // Check if activation succeeded
+    SentSerial("AT+CGACT?");
+    delay(2000);
+    if (Serial1.available()) {
+      rev = Serial1.readString();
+      Serial.println("PDP Context after retry: " + rev);
+      if (rev.indexOf("+CGACT: 1,1") != -1) {
+        Serial.println("PDP context activated successfully on retry!");
+      } else {
+        Serial.println("PDP context activation failed on retry");
+        return false;
+      }
+    } else {
+      Serial.println("No response from retry attempt");
+      return false;
+    }
+  } else {
+    Serial.println("PDP context activated successfully!");
   }
   
   // Check activation status
