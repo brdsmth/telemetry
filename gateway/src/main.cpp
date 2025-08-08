@@ -5,6 +5,59 @@ static const uint32_t GPSBaud = 115200;
 
 String rev;
 
+// Function to read ESP32 battery voltage from ADC
+float getBatteryVoltage() {
+  Serial.println("Reading ESP32 battery voltage...");
+  
+  // Waveshare ESP32-S3 boards use GPIO1 for battery monitoring
+  // with a voltage divider: 200kΩ + 100kΩ resistors
+  const int batteryPin = 1;        // GPIO1 for Waveshare boards
+  const float vRef = 3.3;          // ESP32-S3 reference voltage
+  const float R1 = 200000.0;       // Upper resistor (200kΩ)
+  const float R2 = 100000.0;       // Lower resistor (100kΩ)
+  
+  int adcValue = analogRead(batteryPin);
+  float voltage = (float)adcValue * (vRef / 4095.0);          // Convert ADC to voltage
+  float actualVoltage = voltage * ((R1 + R2) / R2);           // Calculate real battery voltage
+  
+  Serial.println("ADC reading: " + String(adcValue) + " -> ADC voltage: " + String(voltage, 2) + "V -> Battery: " + String(actualVoltage, 2) + "V");
+  return actualVoltage;
+}
+
+// Function to estimate battery percentage based on voltage
+int getBatteryPercentage() {
+  float voltage = getBatteryVoltage();
+  
+  if (voltage < 0) return -1;
+  
+  // LiPo battery voltage ranges (adjust these based on your battery type):
+  // 4.2V = 100% (fully charged)
+  // 3.7V = ~50% (nominal)
+  // 3.3V = ~10% (low)
+  // 3.0V = 0% (cutoff)
+  
+  int percentage;
+  if (voltage >= 4.1) {
+    percentage = 100;
+  } else if (voltage >= 3.9) {
+    percentage = 80 + (voltage - 3.9) * 100; // 80-100%
+  } else if (voltage >= 3.7) {
+    percentage = 50 + (voltage - 3.7) * 150; // 50-80%
+  } else if (voltage >= 3.5) {
+    percentage = 20 + (voltage - 3.5) * 150; // 20-50%
+  } else if (voltage >= 3.3) {
+    percentage = 5 + (voltage - 3.3) * 75;   // 5-20%
+  } else if (voltage >= 3.0) {
+    percentage = (voltage - 3.0) * 16.7;     // 0-5%
+  } else {
+    percentage = 0;
+  }
+  
+  percentage = constrain(percentage, 0, 100);
+  Serial.println("Estimated battery: " + String(percentage) + "%");
+  return percentage;
+}
+
 void SentSerial(const char *p_char) {
   for (int i = 0; i < strlen(p_char); i++) {
     Serial1.write(p_char[i]);
@@ -157,8 +210,21 @@ bool makeHTTPPostRequest(const char* url, const char* data) {
   // Set HTTP parameters
   String urlParam = "AT+HTTPPARA=\"URL\",\"" + String(url) + "\"";
   Serial.println("Setting URL: " + urlParam);
-  if (!SentMessage(urlParam.c_str(), 3000)) {
-    Serial.println("Failed to set URL parameter");
+  Serial.println("URL length: " + String(urlParam.length()));
+  
+  // Try with longer timeout and more debugging
+  SentSerial(urlParam.c_str());
+  delay(2000); // Give more time
+  
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("URL Response: " + rev);
+    if (rev.indexOf("OK") == -1) {
+      Serial.println("Failed to set URL parameter - Response: " + rev);
+      return false;
+    }
+  } else {
+    Serial.println("No response to URL parameter - trying shorter URL...");
     return false;
   }
   
@@ -185,19 +251,23 @@ bool makeHTTPPostRequest(const char* url, const char* data) {
     }
   }
   
-  // Send data
+  // Send data (without CRLF - the module adds it)
   Serial.println("Sending data: " + String(data));
-  SentSerial(data);
-  delay(2000); // Give more time for data transmission
+  Serial.println("Data length: " + String(strlen(data)));
+  Serial1.print(data); // Use print instead of SentSerial to avoid extra CRLF
+  delay(3000); // Give more time for data transmission
   
   // Check for OK after data transmission
   if (Serial1.available()) {
     rev = Serial1.readString();
     Serial.println("Data transmission response: " + rev);
     if (rev.indexOf("OK") == -1) {
-      Serial.println("Data transmission failed");
+      Serial.println("Data transmission failed - Response: " + rev);
       return false;
     }
+  } else {
+    Serial.println("No response after data transmission");
+    return false;
   }
   
   // Execute HTTP POST action
@@ -564,9 +634,21 @@ void setup() {
   if (activateDataConnection()) {
     Serial.println("Data connection activated successfully!");
     
-    // Make HTTP GET request to your server - using shorter URL for testing
-    const char* serverUrl = "http://httpbin.org/post";
-    const char* testData = "{\"device\":\"SIM7670G\",\"status\":\"connected\",\"timestamp\":\"2024-01-01T12:00:00Z\"}";
+    // Make HTTP GET request to your server - using ALB HTTP URL
+    const char* serverUrl = "http://api.autostrux.com";
+    // Read battery for initial test
+    float initialBatteryVoltage = getBatteryVoltage();
+    int initialBatteryPercentage = getBatteryPercentage();
+    
+    String testDataStr = "{\"device\":\"SIM7670G\",\"status\":\"connected\",\"timestamp\":\"2024-01-01T12:00:00Z\"";
+    if (initialBatteryVoltage > 0) {
+      testDataStr += ",\"battery_voltage\":" + String(initialBatteryVoltage, 2);
+    }
+    if (initialBatteryPercentage >= 0) {
+      testDataStr += ",\"battery_percentage\":" + String(initialBatteryPercentage);
+    }
+    testDataStr += "}";
+    const char* testData = testDataStr.c_str();
     
     Serial.println("Making HTTP POST request to test endpoint...");
     if (makeHTTPPostRequest(serverUrl, testData)) {
@@ -590,10 +672,32 @@ void loop() {
   if (millis() - lastRequest > 30000) {
     lastRequest = millis();
     
-    const char* serverUrl = "http://httpbin.org/post";
+    // Use your custom domain - super short URL!
+    const char* serverUrl = "http://api.autostrux.com"; // Custom domain - only 26 chars!
+    // const char* serverUrl = "http://httpbin.org/post"; // Test URL
+    // const char* serverUrl = "http://iot-alb-1026084456.us-east-1.elb.amazonaws.com"; // Direct ALB URL
     
-    // Create JSON string with dynamic uptime
-    String jsonData = "{\"device\":\"SIM7670G\",\"status\":\"periodic\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"uptime\":\"" + String(millis()) + "\"}";
+    // Read battery information
+    float batteryVoltage = getBatteryVoltage();
+    int batteryPercentage = getBatteryPercentage();
+    
+    // Create JSON string with dynamic uptime and battery info
+    String jsonData = "{\"device\":\"SIM7670G\",\"status\":\"periodic\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"uptime\":\"" + String(millis()) + "\"";
+    
+    // Add battery information if successfully read
+    if (batteryVoltage > 0) {
+      jsonData += ",\"battery_voltage\":" + String(batteryVoltage, 2);
+    }
+    if (batteryPercentage >= 0) {
+      jsonData += ",\"battery_percentage\":" + String(batteryPercentage);
+    }
+    
+    jsonData += "}";
+    
+    Serial.println("=== JSON Payload Debug ===");
+    Serial.println("JSON: " + jsonData);
+    Serial.println("JSON Length: " + String(jsonData.length()));
+    Serial.println("=========================");
     
     Serial.println("Making periodic HTTP POST request...");
     if (makeHTTPPostRequest(serverUrl, jsonData.c_str())) {
