@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -56,6 +58,37 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
+// Function to print all available network interfaces
+func printNetworkInterfaces() {
+	fmt.Println("=== Available Network Interfaces ===")
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("Error getting interfaces: %v", err)
+		return
+	}
+
+	for _, iface := range interfaces {
+		// Skip loopback and down interfaces
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok {
+				if ipnet.IP.To4() != nil { // Only IPv4 addresses
+					fmt.Printf("Interface: %s, IP: %s\n", iface.Name, ipnet.IP.String())
+				}
+			}
+		}
+	}
+	fmt.Println("=====================================")
+}
+
 func main() {
 
 	if err := godotenv.Load(); err != nil {
@@ -78,9 +111,44 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hello, World!"))
 	})
+	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("---> /test")
+		
+		// Print request method and headers
+		fmt.Printf("Method: %s\n", r.Method)
+		fmt.Printf("Content-Type: %s\n", r.Header.Get("Content-Type"))
+		fmt.Printf("Content-Length: %s\n", r.Header.Get("Content-Length"))
+		
+		// Read and print the request body
+		if r.Body != nil {
+			bodyBytes, err := io.ReadAll(r.Body)
+			if err != nil {
+				fmt.Printf("Error reading body: %v\n", err)
+			} else {
+				fmt.Printf("Body: %s\n", string(bodyBytes))
+				
+				// Try to parse as JSON and pretty print
+				var jsonData interface{}
+				if err := json.Unmarshal(bodyBytes, &jsonData); err == nil {
+					prettyJSON, _ := json.MarshalIndent(jsonData, "", "  ")
+					fmt.Printf("JSON Payload:\n%s\n", string(prettyJSON))
+				}
+			}
+		}
+		
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test successful"))
+	})
+
+	// Ingest handler
 	http.HandleFunc("/ingest", ingestHandler)
 
 	port := "8080"
+	
+	// Print available network interfaces
+	printNetworkInterfaces()
+	
 	log.Println("🚀 Ingest server listening on port", port)
+	log.Println("📡 ESP32 should use one of the IP addresses above with port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
