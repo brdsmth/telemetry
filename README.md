@@ -2,7 +2,7 @@
 
 ## Sensor 
 
-- Code in the [sensor](./sensor/) directory is meant for ESPs connected to watermark sensors 
+- Code in the [sensor](./sensor/) directory is meant for ESPs connected to soil moisture sensors
 
 ## Gateway 
 
