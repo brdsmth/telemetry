@@ -12,4 +12,4 @@ monitor:
 clean:
 	pio run --target clean -v
 
-all: build upload monitor 
+all: clean build upload monitor 
