@@ -311,6 +311,203 @@ bool makeHTTPPostRequest(const char* url, const char* data) {
   return true;
 }
 
+// Function to scan for available networks
+bool scanAvailableNetworks() {
+  Serial.println("Scanning for available networks...");
+  Serial.println("This may take 30-120 seconds, please wait...");
+  
+  // Send AT+COPS=? command to scan for available networks
+  SentSerial("AT+COPS=?");
+  
+  // Network scanning can take a very long time (up to 2 minutes)
+  unsigned long startTime = millis();
+  unsigned long timeout = 120000; // 2 minutes timeout
+  String response = "";
+  bool gotResponse = false;
+  
+  while (millis() - startTime < timeout) {
+    if (Serial1.available()) {
+      String chunk = Serial1.readString();
+      response += chunk;
+      
+      // Check if we got the complete response (ends with OK or ERROR)
+      if (response.indexOf("OK") != -1 || response.indexOf("ERROR") != -1) {
+        gotResponse = true;
+        break;
+      }
+    }
+    
+    // Print progress every 10 seconds
+    if ((millis() - startTime) % 10000 == 0) {
+      Serial.println("Still scanning... " + String((millis() - startTime) / 1000) + "s elapsed");
+    }
+    
+    delay(100);
+  }
+  
+  if (gotResponse) {
+    Serial.println("Available Networks: " + response);
+    
+    // Parse and display networks in a more readable format
+    if (response.indexOf("+COPS:") != -1) {
+      Serial.println("\n=== Available Networks ===");
+      
+      // Simple parsing to extract network information
+      int startPos = response.indexOf("+COPS:");
+      if (startPos != -1) {
+        String networkList = response.substring(startPos);
+        Serial.println(networkList);
+      }
+      
+      Serial.println("===========================\n");
+    }
+    return true;
+  } else {
+    Serial.println("Network scan timed out or failed!");
+    return false;
+  }
+}
+
+// Structure to hold signal metrics
+struct SignalMetrics {
+  int rssi = 99;        // CSQ RSSI (0-31, 99=unknown)
+  int ber = 99;         // CSQ BER (0-7, 99=unknown)
+  int rsrp = -999;      // CESQ RSRP (dBm)
+  int rsrq = -999;      // CESQ RSRQ (dB)
+  int sinr = -999;      // CPSI SINR (dB)
+  String rat = "";      // Radio Access Technology
+  String band = "";     // LTE Band
+  int earfcn = -1;      // EARFCN frequency
+  bool valid = false;   // Whether metrics were successfully collected
+};
+
+// Function to collect comprehensive signal metrics
+SignalMetrics getSignalMetrics() {
+  SignalMetrics metrics;
+  Serial.println("Collecting signal metrics...");
+  
+  // Get basic signal quality (AT+CSQ)
+  Serial.println("Getting CSQ signal quality...");
+  SentSerial("AT+CSQ");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("CSQ Response: " + rev);
+    
+    // Parse CSQ: +CSQ: <rssi>,<ber>
+    int csqStart = rev.indexOf("+CSQ: ");
+    if (csqStart != -1) {
+      String csqData = rev.substring(csqStart + 6);
+      int commaPos = csqData.indexOf(",");
+      if (commaPos != -1) {
+        metrics.rssi = csqData.substring(0, commaPos).toInt();
+        metrics.ber = csqData.substring(commaPos + 1).toInt();
+        Serial.println("Parsed CSQ - RSSI: " + String(metrics.rssi) + ", BER: " + String(metrics.ber));
+      }
+    }
+  }
+  
+  // Get extended signal quality (AT+CESQ)
+  Serial.println("Getting CESQ extended signal quality...");
+  SentSerial("AT+CESQ");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("CESQ Response: " + rev);
+    
+    // Parse CESQ: +CESQ: <rxlev>,<ber>,<rscp>,<ecno>,<rsrq>,<rsrp>
+    int cesqStart = rev.indexOf("+CESQ: ");
+    if (cesqStart != -1) {
+      String cesqData = rev.substring(cesqStart + 7);
+      // Split by commas to get individual values
+      int values[6];
+      int valueIndex = 0;
+      int startPos = 0;
+      
+      for (int i = 0; i < cesqData.length() && valueIndex < 6; i++) {
+        if (cesqData.charAt(i) == ',' || i == cesqData.length() - 1) {
+          String valueStr = cesqData.substring(startPos, i);
+          values[valueIndex] = valueStr.toInt();
+          startPos = i + 1;
+          valueIndex++;
+        }
+      }
+      
+      if (valueIndex >= 6) {
+        // For LTE: RSRQ is values[4], RSRP is values[5]
+        if (values[4] != 255) metrics.rsrq = values[4] - 140; // Convert to dB
+        if (values[5] != 255) metrics.rsrp = values[5] - 140; // Convert to dBm
+        Serial.println("Parsed CESQ - RSRQ: " + String(metrics.rsrq) + " dB, RSRP: " + String(metrics.rsrp) + " dBm");
+      }
+    }
+  }
+  
+  // Get serving cell info (AT+CPSI?)
+  Serial.println("Getting CPSI serving cell info...");
+  SentSerial("AT+CPSI?");
+  delay(2000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("CPSI Response: " + rev);
+    
+    // Parse CPSI for LTE: +CPSI: LTE,Online,MCC-MNC,TAC,CID,EARFCN,Band,UL_BW,DL_BW,TDD_Config,TDD_SSC,PCI,RSRP,RSRQ,RSSI,SINR
+    if (rev.indexOf("LTE") != -1) {
+      metrics.rat = "LTE";
+      
+      // Extract specific values
+      int cpsiStart = rev.indexOf("+CPSI: ");
+      if (cpsiStart != -1) {
+        String cpsiData = rev.substring(cpsiStart + 7);
+        
+        // Parse comma-separated values
+        int commaCount = 0;
+        int startPos = 0;
+        
+        for (int i = 0; i < cpsiData.length(); i++) {
+          if (cpsiData.charAt(i) == ',' || i == cpsiData.length() - 1) {
+            String value = cpsiData.substring(startPos, i);
+            
+            switch (commaCount) {
+              case 5: // EARFCN
+                metrics.earfcn = value.toInt();
+                break;
+              case 6: // Band
+                metrics.band = value;
+                break;
+              case 15: // SINR (last field)
+                metrics.sinr = value.toInt();
+                break;
+            }
+            
+            startPos = i + 1;
+            commaCount++;
+          }
+        }
+        
+        Serial.println("Parsed CPSI - RAT: " + metrics.rat + ", Band: " + metrics.band + 
+                      ", EARFCN: " + String(metrics.earfcn) + ", SINR: " + String(metrics.sinr) + " dB");
+      }
+    }
+  }
+  
+  // Mark as valid if we got at least basic signal data
+  metrics.valid = (metrics.rssi != 99 || metrics.rsrp != -999);
+  
+  Serial.println("=== Signal Metrics Summary ===");
+  Serial.println("RSSI: " + String(metrics.rssi) + " (CSQ scale 0-31)");
+  Serial.println("BER: " + String(metrics.ber) + " (CSQ scale 0-7)");
+  Serial.println("RSRP: " + String(metrics.rsrp) + " dBm");
+  Serial.println("RSRQ: " + String(metrics.rsrq) + " dB");
+  Serial.println("SINR: " + String(metrics.sinr) + " dB");
+  Serial.println("RAT: " + metrics.rat);
+  Serial.println("Band: " + metrics.band);
+  Serial.println("EARFCN: " + String(metrics.earfcn));
+  Serial.println("Valid: " + String(metrics.valid ? "Yes" : "No"));
+  Serial.println("===============================");
+  
+  return metrics;
+}
+
 // Function to check network status
 bool checkNetworkStatus() {
   Serial.println("Checking network status...");
@@ -339,6 +536,44 @@ bool checkNetworkStatus() {
     Serial.println("PDP Context: " + rev);
   }
   
+  return true;
+}
+
+// Function to force LTE-only mode
+bool configureLTEOnly() {
+  Serial.println("Configuring LTE-only mode (3G/2G are shut down in US)...");
+  
+  // Force LTE-only mode (no 3G/2G fallback)
+  Serial.println("Setting network mode to LTE only...");
+  if (!SentMessage("AT+CNMP=38", 5000)) {
+    Serial.println("Failed to set LTE-only mode");
+    return false;
+  }
+  
+  // Force LTE Cat-M1 only (better for IoT applications)
+  Serial.println("Setting LTE band to Cat-M1 only...");
+  if (!SentMessage("AT+CMNB=1", 5000)) {
+    Serial.println("Failed to set Cat-M1 mode");
+    return false;
+  }
+  
+  // Verify the LTE settings
+  Serial.println("Verifying LTE configuration...");
+  SentSerial("AT+CNMP?");
+  delay(1000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("Network Mode: " + rev);
+  }
+  
+  SentSerial("AT+CMNB?");
+  delay(1000);
+  if (Serial1.available()) {
+    rev = Serial1.readString();
+    Serial.println("LTE Band Mode: " + rev);
+  }
+  
+  Serial.println("✅ LTE-only configuration complete!");
   return true;
 }
 
@@ -471,6 +706,10 @@ bool initializeSIMAndNetwork() {
     Serial.println("Current Operator: " + rev);
   }
   
+  // Scan for available networks
+  Serial.println("Scanning for available networks...");
+  scanAvailableNetworks();
+  
   // Try to set automatic operator selection
   Serial.println("Setting automatic operator selection...");
   if (!SentMessage("AT+COPS=0", 5000)) {
@@ -542,6 +781,12 @@ bool activateDataConnection() {
   // Initialize SIM and register to network first
   if (!initializeSIMAndNetwork()) {
     Serial.println("Failed to initialize SIM or register to network");
+    return false;
+  }
+  
+  // Force LTE-only mode (3G/2G networks are shut down in US)
+  if (!configureLTEOnly()) {
+    Serial.println("Failed to configure LTE-only mode");
     return false;
   }
   
@@ -626,9 +871,20 @@ void setup() {
   
   SentMessage("ATD10086;", 2000);
   SentSerial("ATE1;");
+  
+  // Force LTE-only mode immediately (3G/2G networks shut down in US)
+  Serial.println("Forcing LTE-only mode during setup...");
+  SentMessage("AT+CNMP=38", 3000);   // LTE only
+  SentMessage("AT+CMNB=1", 3000);    // LTE Cat-M1 only
+  
   SentSerial("AT+COPS?");
   SentSerial("AT+CGDCONT?");
   SentSerial("AT+SIMCOMATI");
+  
+  // Optional: Scan for available networks during setup
+  // Uncomment the following line if you want to scan for networks during initial setup
+  // Serial.println("Performing initial network scan...");
+  // scanAvailableNetworks();
   
   // Activate data connection
   if (activateDataConnection()) {
@@ -640,6 +896,9 @@ void setup() {
     float initialBatteryVoltage = getBatteryVoltage();
     int initialBatteryPercentage = getBatteryPercentage();
     
+    // Get signal metrics for initial test
+    SignalMetrics signalData = getSignalMetrics();
+    
     String testDataStr = "{\"device\":\"SIM7670G\",\"status\":\"connected\",\"timestamp\":\"2024-01-01T12:00:00Z\"";
     if (initialBatteryVoltage > 0) {
       testDataStr += ",\"battery_voltage\":" + String(initialBatteryVoltage, 2);
@@ -647,6 +906,33 @@ void setup() {
     if (initialBatteryPercentage >= 0) {
       testDataStr += ",\"battery_percentage\":" + String(initialBatteryPercentage);
     }
+    
+    // Add signal metrics if valid
+    if (signalData.valid) {
+      testDataStr += ",\"signal_metrics\":{";
+      testDataStr += "\"rssi\":" + String(signalData.rssi);
+      testDataStr += ",\"ber\":" + String(signalData.ber);
+      if (signalData.rsrp != -999) {
+        testDataStr += ",\"rsrp\":" + String(signalData.rsrp);
+      }
+      if (signalData.rsrq != -999) {
+        testDataStr += ",\"rsrq\":" + String(signalData.rsrq);
+      }
+      if (signalData.sinr != -999) {
+        testDataStr += ",\"sinr\":" + String(signalData.sinr);
+      }
+      if (signalData.rat != "") {
+        testDataStr += ",\"rat\":\"" + signalData.rat + "\"";
+      }
+      if (signalData.band != "") {
+        testDataStr += ",\"band\":\"" + signalData.band + "\"";
+      }
+      if (signalData.earfcn != -1) {
+        testDataStr += ",\"earfcn\":" + String(signalData.earfcn);
+      }
+      testDataStr += "}";
+    }
+    
     testDataStr += "}";
     const char* testData = testDataStr.c_str();
     
@@ -681,7 +967,10 @@ void loop() {
     float batteryVoltage = getBatteryVoltage();
     int batteryPercentage = getBatteryPercentage();
     
-    // Create JSON string with dynamic uptime and battery info
+    // Get current signal metrics
+    SignalMetrics currentSignal = getSignalMetrics();
+    
+    // Create JSON string with dynamic uptime, battery info, and signal metrics
     String jsonData = "{\"device\":\"SIM7670G\",\"status\":\"periodic\",\"timestamp\":\"2024-01-01T12:00:00Z\",\"uptime\":\"" + String(millis()) + "\"";
     
     // Add battery information if successfully read
@@ -690,6 +979,32 @@ void loop() {
     }
     if (batteryPercentage >= 0) {
       jsonData += ",\"battery_percentage\":" + String(batteryPercentage);
+    }
+    
+    // Add signal metrics if valid
+    if (currentSignal.valid) {
+      jsonData += ",\"signal_metrics\":{";
+      jsonData += "\"rssi\":" + String(currentSignal.rssi);
+      jsonData += ",\"ber\":" + String(currentSignal.ber);
+      if (currentSignal.rsrp != -999) {
+        jsonData += ",\"rsrp\":" + String(currentSignal.rsrp);
+      }
+      if (currentSignal.rsrq != -999) {
+        jsonData += ",\"rsrq\":" + String(currentSignal.rsrq);
+      }
+      if (currentSignal.sinr != -999) {
+        jsonData += ",\"sinr\":" + String(currentSignal.sinr);
+      }
+      if (currentSignal.rat != "") {
+        jsonData += ",\"rat\":\"" + currentSignal.rat + "\"";
+      }
+      if (currentSignal.band != "") {
+        jsonData += ",\"band\":\"" + currentSignal.band + "\"";
+      }
+      if (currentSignal.earfcn != -1) {
+        jsonData += ",\"earfcn\":" + String(currentSignal.earfcn);
+      }
+      jsonData += "}";
     }
     
     jsonData += "}";
