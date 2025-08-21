@@ -6,6 +6,9 @@ String Telemetry::toJson() const {
   doc["device"] = device;
   doc["status"] = status;
   doc["timestamp"] = timestamp;
+  doc["batteryPresent"] = batteryPresent;
+  doc["batteryVoltage"] = batteryVoltage;
+  doc["batteryPercent"] = batteryPercent;
 
   String json;
   serializeJson(doc, json);
