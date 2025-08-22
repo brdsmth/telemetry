@@ -25,4 +25,7 @@
 .LSOverride
 
 # Misc
-*.log 
+*.log
+
+# Sensitive files
+.env 

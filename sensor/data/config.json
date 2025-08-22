@@ -1,0 +1,10 @@
+{
+  "wifi_enabled": true,
+  "wifi_http_enabled": true,
+  "wifi_http_url": "http://192.168.1.19:8000/",
+  "ble_enabled": true,
+  "web_server_enabled": true,
+  "data_logging_enabled": true,
+  "system_status_enabled": true,
+  "sensor_interval_ms": 10000
+}

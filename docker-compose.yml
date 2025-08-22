@@ -6,7 +6,7 @@ services:
     container_name: telemetry_db
     environment:
       POSTGRES_USER: telemetry
-      POSTGRES_PASSWORD: telemetrypass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: telemetry
     ports:
       - "5432:5432"

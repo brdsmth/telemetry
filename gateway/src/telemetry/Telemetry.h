@@ -9,6 +9,8 @@ struct Telemetry {
   bool   batteryPresent;    // true if gauge detects a battery
   float  batteryVoltage;    // volts (0.0 if not present)
   float  batteryPercent;    // % (0.0 if not present)
+  float  latitude;          // degrees (null if no fix)
+  float  longitude;         // degrees (null if no fix)
 
   String toJson() const;
 };
