@@ -392,28 +392,79 @@ void logDataToSPIFFS(float sensor1, float sensor2, float sensor3) {
 // === WiFi Connection Function ===
 bool connectToWiFi(const char* ssid, const char* password) {
     logln("\n-----> Connecting to WiFi...");
-    logln("-----> SSID: " + String(ssid));
-    
+
+
+    // Set WiFi mode and disconnect any previous connections
     WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
+    WiFi.disconnect(true);
+    delay(1000);
     
-    logln("-----> Waiting for connection...");
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
+    // Scan for networks first
+    logln("-----> Scanning for networks...");
+    int n = WiFi.scanNetworks();
+    logln("-----> Found " + String(n) + " networks:");
+    
+    bool networkFound = false;
+    for (int i = 0; i < n; i++) {
+      String scannedSSID = WiFi.SSID(i);
+      int rssi = WiFi.RSSI(i);
+      logln("  " + String(i) + ": " + scannedSSID + " (" + String(rssi) + "dBm)");
+      if (scannedSSID == ssid) {
+        networkFound = true;
+        logln("  >> Target network found!");
+      }
     }
-    Serial.println();
-     
+    
+    if (!networkFound) {
+      logln("ERROR: Target network '" + String(ssid) + "' not found!");
+      return false;
+    }
+    
+    logln("-----> Connecting to " + String(ssid) + "...");
+    logln("-----> Using password: " + String(password));
+    
+    // Try different connection approaches
+    WiFi.setAutoReconnect(false);
+    WiFi.persistent(false);
+    
+    // Set hostname to avoid conflicts
+    WiFi.setHostname("ESP32-Sensor");
+    
+    // Try connecting
+    WiFi.begin(ssid, password);
+  
+    int wifi_retries = 0;
+    while (WiFi.status() != WL_CONNECTED && wifi_retries < 30) {
+        delay(1000);  // Longer delay
+
+        Serial.print(".");
+        wifi_retries++;
+        
+        // Print detailed status every 5 attempts
+        if (wifi_retries % 5 == 0) {
+          int status = WiFi.status();
+          logln("\n-----> Attempt " + String(wifi_retries) + "/30, Status: " + String(status));
+          
+          if (status == WL_CONNECT_FAILED) {
+            logln("-----> Connection failed, retrying...");
+            WiFi.disconnect();
+            delay(1000);
+            WiFi.begin(ssid, password);
+          }
+        }
+    }
+
+
     if (WiFi.status() == WL_CONNECTED) {
-        logln("-----> WiFi CONNECTED!");
-        logln("-----> IP: " + WiFi.localIP().toString());
-        logln("-----> RSSI: " + String(WiFi.RSSI()) + "dBm");
-        return true;
+      logln("\n-----> WIFI CONNECTED!");
+      logln("-----> IP: " + WiFi.localIP().toString());
+      logln("-----> RSSI: " + String(WiFi.RSSI()) + "dBm");
+      return true;
     } else {
-        logln("-----> WiFi FAILED! Status: " + String(WiFi.status()));
-        return false;
+      logln("\n-----> WIFI CONNECTION FAILED!");
+      logln("-----> Final status: " + String(WiFi.status()));
+      logln("-----> Status codes: 0=IDLE, 1=NO_SSID, 3=CONNECTED, 4=CONNECT_FAILED, 6=DISCONNECTED");
+      return false;
     }
 }
 
@@ -550,11 +601,14 @@ void setup() {
     // Print configuration
     printConfig();
     
-    // if (BLE_ENABLED) setupBLE();
+    if (BLE_ENABLED) setupBLE();
     
     // Connect to WiFi
     if (WIFI_ENABLED) {
-        if (connectToWiFi("SpectrumSetup-8A38", "mainbelt780")) {
+        WIFI_SSID = "YOUR_SSID";
+        WIFI_PASSWORD = "YOUR_PASSWORD";
+        logln("-----> Connecting to WiFi: " + String(WIFI_SSID) + " with password: " + String(WIFI_PASSWORD));
+        if (connectToWiFi(WIFI_SSID, WIFI_PASSWORD)) {
             // Sync time via NTP after WiFi connects
             syncNTPTime();
             

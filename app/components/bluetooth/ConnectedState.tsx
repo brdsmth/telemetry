@@ -41,6 +41,13 @@ const ConnectedState: React.FunctionComponent<ConnectedStateProps> = ({bleServic
           <Text style={styles.buttonText}>DISCONNECT</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        onPress={() => onDisconnect(bleService.peripheralId)}
+        style={styles.resetButton}
+      >
+        <Text style={styles.resetButtonText}>← Back to Device List</Text>
+      </TouchableOpacity>
     </>
   );
 };
@@ -86,5 +93,19 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
+    },
+    resetButton: {
+      backgroundColor: "#f0f0f0",
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 16,
+      borderWidth: 1,
+      borderColor: "#ddd",
+    },
+    resetButtonText: {
+      color: "#007AFF",
+      fontSize: 16,
+      textAlign: "center",
+      fontWeight: "500",
     },
   });

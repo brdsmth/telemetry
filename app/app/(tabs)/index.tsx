@@ -2,7 +2,7 @@ import ConnectedState from "@/components/bluetooth/ConnectedState";
 import DisconnectedState from "@/components/bluetooth/DisconnectedState";
 import { PeripheralServices } from "@/types/bluetooth";
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, StyleSheet, Platform, Alert, Linking, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Platform, Alert, Linking, ScrollView, TouchableOpacity } from "react-native";
 import { BleManager, Device } from 'react-native-ble-plx';
 
 const SECONDS_TO_SCAN_FOR = 5000; // milliseconds
@@ -12,6 +12,7 @@ const RECEIVE_CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
 const BluetoothDemoScreen: React.FC = () => {
   const bleManagerRef = useRef<BleManager | null>(null);
+  const disconnectSubscriptionRef = useRef<any>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<Map<string, Device>>(new Map());
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
@@ -64,7 +65,7 @@ const BluetoothDemoScreen: React.FC = () => {
     });
 
     // Monitor state changes
-    const subscription = manager.onStateChange((state) => {
+    const stateSubscription = manager.onStateChange((state) => {
       addDebugLog(`Bluetooth state changed: ${state}`);
     }, true);
 
@@ -72,7 +73,10 @@ const BluetoothDemoScreen: React.FC = () => {
 
     return () => {
       addDebugLog("Cleaning up BLE Manager...");
-      subscription.remove();
+      stateSubscription.remove();
+      if (disconnectSubscriptionRef.current) {
+        disconnectSubscriptionRef.current.remove();
+      }
       manager.destroy();
     };
   }, []);
@@ -186,6 +190,35 @@ const BluetoothDemoScreen: React.FC = () => {
         }
       );
       
+      // Monitor device disconnection
+      if (disconnectSubscriptionRef.current) {
+        disconnectSubscriptionRef.current.remove();
+      }
+      disconnectSubscriptionRef.current = bleManagerRef.current.onDeviceDisconnected(
+        device.id,
+        (error, disconnectedDevice) => {
+          if (error) {
+            addErrorLog("Disconnection error", error.message);
+          }
+          
+          if (disconnectedDevice) {
+            addDebugLog(`Device ${disconnectedDevice.name || disconnectedDevice.id} disconnected`);
+            
+            // Clean up connection state
+            addDebugLog("Cleaning up after disconnection...");
+            setConnectedDevice(null);
+            setBleService(undefined);
+            setDevices(new Map());
+            
+            Alert.alert(
+              "Device Disconnected",
+              `${disconnectedDevice.name || "ESP32"} has disconnected.`,
+              [{ text: "OK" }]
+            );
+          }
+        }
+      );
+      
       addDebugLog("✅ Connection complete!");
       
     } catch (error: any) {
@@ -201,13 +234,33 @@ const BluetoothDemoScreen: React.FC = () => {
 
     try {
       addDebugLog("Disconnecting...");
+      
+      // Stop any ongoing scan
+      if (isScanning) {
+        bleManagerRef.current.stopDeviceScan();
+        setIsScanning(false);
+      }
+      
+      // Disconnect device
       await bleManagerRef.current.cancelDeviceConnection(peripheralId);
+      
+      // Reset all connection state
       setBleService(undefined);
       setConnectedDevice(null);
       setDevices(new Map());
-      addDebugLog("Disconnected");
+      
+      // Clear logs for fresh start
+      setErrorLog([]);
+      setDebugLog([]);
+      
+      addDebugLog("✅ Disconnected successfully - ready to scan again");
+      
     } catch (error: any) {
-      addErrorLog("Disconnect failed", error.message);
+      // Even if disconnect fails, reset the state
+      addErrorLog("Disconnect error (state reset anyway)", error.message);
+      setBleService(undefined);
+      setConnectedDevice(null);
+      setDevices(new Map());
     }
   };
 
@@ -270,9 +323,48 @@ const BluetoothDemoScreen: React.FC = () => {
     rssi: device.rssi || 0,
   }));
 
+  const forceReset = async () => {
+    addDebugLog("🔄 Force reset initiated");
+    
+    if (bleManagerRef.current) {
+      try {
+        // Stop scan if running
+        if (isScanning) {
+          bleManagerRef.current.stopDeviceScan();
+        }
+        
+        // Disconnect if connected
+        if (connectedDevice) {
+          await bleManagerRef.current.cancelDeviceConnection(connectedDevice.id).catch(() => {});
+        }
+      } catch (error) {
+        // Ignore errors during force reset
+      }
+    }
+    
+    // Reset all state
+    setIsScanning(false);
+    setDevices(new Map());
+    setConnectedDevice(null);
+    setBleService(undefined);
+    setErrorLog([]);
+    setDebugLog([]);
+    
+    addDebugLog("✅ Force reset complete - ready to scan");
+    
+    Alert.alert("Reset Complete", "All connections cleared. You can now scan for devices.");
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Bluetooth Demo</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Bluetooth Demo</Text>
+        {connectedDevice && (
+          <TouchableOpacity onPress={forceReset} style={styles.resetHeaderButton}>
+            <Text style={styles.resetHeaderButtonText}>🔄 Reset</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
       {!connectedDevice ? (
         <DisconnectedState
@@ -322,11 +414,29 @@ const styles = StyleSheet.create({
     paddingVertical: "10%",
     paddingHorizontal: 20,
   },
+  headerContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   header: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 16,
     color: "#333",
+  },
+  resetHeaderButton: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+  },
+  resetHeaderButtonText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
   logContainer: {
     backgroundColor: "#fff",
