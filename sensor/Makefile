@@ -1,4 +1,4 @@
-.PHONY: build upload monitor clean erase uploadfs all
+.PHONY: build upload monitor clean erase uploadfs test all
 
 # Load environment variables if .env exists
 ifneq (,$(wildcard .env))
@@ -7,7 +7,10 @@ ifneq (,$(wildcard .env))
 endif
 
 build:
-	pio run
+	pio run -e esp32dev
+
+test:
+	pio test -e native
 
 upload:
 	pio run --target upload
