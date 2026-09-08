@@ -3,19 +3,13 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WebServer.h>
-#include <esp_now.h>
 #include <NimBLEDevice.h>
 #include <SPIFFS.h>
 #include <time.h>
 #include <ArduinoJson.h>
-extern "C" {
-  #include "esp_wifi.h"
-}
 
 // === Project includes ===
 #include "logger.h"
-#include "espnow_utils.h"
-#include "wifi_manager.h"
 
 
 // === Configuration (loaded from SPIFFS config.json) ===
@@ -676,13 +670,6 @@ void loop() {
         if (SYSTEM_STATUS_ENABLED) {
             printSystemStatus();
         }
-
-        int pins[] = {32,33,34,35,36,39};
-
-        for (int i = 0; i < 6; i++) {
-            Serial.printf("GPIO %d = %d\n", pins[i], analogRead(pins[i])); // added: scan ADC pins
-        }
-        Serial.println("----");
 
         logln("\n === LOOP COMPLETE ===");
     }
