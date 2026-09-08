@@ -1,10 +1,15 @@
 {
   "wifi_enabled": true,
   "wifi_http_enabled": true,
-  "wifi_http_url": "http://YOUR_SERVER_IP:8000/",
+  "wifi_http_url": "http://YOUR_SERVER_IP:8000/ingest",
   "ble_enabled": true,
   "web_server_enabled": true,
   "data_logging_enabled": true,
   "system_status_enabled": true,
-  "sensor_interval_ms": 10000
+  "sensor_interval_ms": 10000,
+  "node_id": "soil-1",
+  "depth_cm": 0,
+  "supply_millivolts": 3300,
+  "series_resistor_ohms": 100000,
+  "adc_samples": 16
 }

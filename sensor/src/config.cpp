@@ -38,6 +38,11 @@ bool loadConfig(Config& cfg) {
     cfg.dataLoggingEnabled  = doc["data_logging_enabled"]  | cfg.dataLoggingEnabled;
     cfg.systemStatusEnabled = doc["system_status_enabled"] | cfg.systemStatusEnabled;
     cfg.sensorIntervalMs    = doc["sensor_interval_ms"]    | cfg.sensorIntervalMs;
+    cfg.nodeId              = doc["node_id"]               | cfg.nodeId;
+    cfg.depthCm             = doc["depth_cm"]              | cfg.depthCm;
+    cfg.supplyMillivolts    = doc["supply_millivolts"]     | cfg.supplyMillivolts;
+    cfg.seriesResistorOhms  = doc["series_resistor_ohms"]  | cfg.seriesResistorOhms;
+    cfg.adcSamples          = doc["adc_samples"]           | cfg.adcSamples;
 
     logln("-----> Configuration loaded successfully");
     return true;
@@ -55,5 +60,10 @@ void printConfig(const Config& cfg) {
     logln("-----> Data Logging Enabled: " + yesNo(cfg.dataLoggingEnabled));
     logln("-----> System Status Enabled: " + yesNo(cfg.systemStatusEnabled));
     logln("-----> Sensor Interval: " + String(cfg.sensorIntervalMs) + "ms");
+    logln("-----> Node ID: " + cfg.nodeId);
+    logln("-----> Depth: " + String(cfg.depthCm) + "cm");
+    logln("-----> Supply: " + String(cfg.supplyMillivolts, 0) + "mV");
+    logln("-----> Series Resistor: " + String(cfg.seriesResistorOhms, 0) + " ohm");
+    logln("-----> ADC Samples: " + String(cfg.adcSamples));
     logln("=== END CONFIGURATION ===\n");
 }

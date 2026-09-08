@@ -23,8 +23,12 @@ bool DataLog::begin() {
     logln("-----> Free: " + String(totalBytes - usedBytes) + " bytes");
 
     if (SPIFFS.exists(path_)) {
-        logln("-----> Log file already exists");
-        return true;
+        if (headerMatches()) {
+            logln("-----> Log file already exists");
+            return true;
+        }
+        logln("-----> Log file has a different header, recreating it");
+        SPIFFS.remove(path_);
     }
 
     logln("-----> Creating new log file...");
@@ -77,4 +81,13 @@ bool DataLog::writeHeader() {
     file.println(header_);
     file.close();
     return true;
+}
+
+bool DataLog::headerMatches() const {
+    File file = SPIFFS.open(path_, FILE_READ);
+    if (!file) return false;
+    String first = file.readStringUntil('\n');
+    file.close();
+    first.trim();
+    return first == header_;
 }

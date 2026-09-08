@@ -13,6 +13,15 @@ struct Config {
     bool   dataLoggingEnabled   = true;
     bool   systemStatusEnabled  = true;
     unsigned long sensorIntervalMs = 10000;
+
+    // Identity reported to the ingest API
+    String nodeId              = "soil-1";
+    int    depthCm             = 0;
+
+    // Voltage divider (see soil/soil_math.h)
+    float  supplyMillivolts    = 3300.0f;
+    float  seriesResistorOhms  = 100000.0f;
+    int    adcSamples          = 16;
 };
 
 // Overwrites cfg with values from /config.json. Missing keys keep their defaults.

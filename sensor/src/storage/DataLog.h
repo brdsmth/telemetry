@@ -10,7 +10,8 @@ public:
     DataLog(const char* path, const char* header);
 
     // Mounts SPIFFS (formatting on first use) and creates the file with its
-    // header if it does not exist yet.
+    // header if it does not exist yet. An existing file whose first line does
+    // not match the header (older firmware, different columns) is recreated.
     bool begin();
 
     bool append(const String& line);
@@ -24,6 +25,7 @@ public:
 
 private:
     bool writeHeader();
+    bool headerMatches() const;
 
     const char* path_;
     const char* header_;
