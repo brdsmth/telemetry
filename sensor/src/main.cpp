@@ -421,7 +421,6 @@ bool connectToWiFi(const char* ssid, const char* password) {
     }
     
     logln("-----> Connecting to " + String(ssid) + "...");
-    logln("-----> Using password: " + String(password));
     
     // Try different connection approaches
     WiFi.setAutoReconnect(false);
@@ -605,9 +604,6 @@ void setup() {
     
     // Connect to WiFi
     if (WIFI_ENABLED) {
-        WIFI_SSID = "YOUR_SSID";
-        WIFI_PASSWORD = "YOUR_PASSWORD";
-        logln("-----> Connecting to WiFi: " + String(WIFI_SSID) + " with password: " + String(WIFI_PASSWORD));
         if (connectToWiFi(WIFI_SSID, WIFI_PASSWORD)) {
             // Sync time via NTP after WiFi connects
             syncNTPTime();
