@@ -5,8 +5,39 @@
 
 #include "logger.h"
 
+// Reason codes from esp_wifi_types.h. The ones that matter for debugging:
+// 2 / 15 / 202 -> almost always a wrong password, 200 / 201 -> weak or no
+// signal, 8 -> the AP told us to leave.
+static const char* disconnectReasonName(uint8_t reason) {
+    switch (reason) {
+        case 2:   return "auth expired";
+        case 8:   return "AP sent disassoc";
+        case 15:  return "4-way handshake timeout (wrong password?)";
+        case 200: return "beacon timeout (weak signal)";
+        case 201: return "no AP found";
+        case 202: return "auth failed (wrong password?)";
+        case 203: return "assoc failed";
+        case 204: return "handshake timeout";
+        default:  return "";
+    }
+}
+
+static void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+        uint8_t reason = info.wifi_sta_disconnected.reason;
+        logln("\n-----> WiFi disconnected, reason " + String(reason) + " " +
+              disconnectReasonName(reason));
+    }
+}
+
 bool connectToWiFi(const char* ssid, const char* password) {
     logln("\n-----> Connecting to WiFi...");
+
+    static bool eventHandlerInstalled = false;
+    if (!eventHandlerInstalled) {
+        WiFi.onEvent(onWiFiEvent);
+        eventHandlerInstalled = true;
+    }
 
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(true);
