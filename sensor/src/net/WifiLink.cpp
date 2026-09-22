@@ -76,15 +76,15 @@ bool connectToWiFi(const char* ssid, const char* password) {
         Serial.print(".");
         retries++;
 
+        // Auto-reconnect is off, so after a single failed association the
+        // stack sits at WL_DISCONNECTED (6) and never tries again on its own.
+        // Kick off a fresh attempt every few seconds whatever the status is.
         if (retries % 5 == 0) {
             int status = WiFi.status();
-            logln("\n-----> Attempt " + String(retries) + "/30, Status: " + String(status));
-            if (status == WL_CONNECT_FAILED) {
-                logln("-----> Connection failed, retrying...");
-                WiFi.disconnect();
-                delay(1000);
-                WiFi.begin(ssid, password);
-            }
+            logln("\n-----> Attempt " + String(retries) + "/30, Status: " + String(status) + ", retrying...");
+            WiFi.disconnect();
+            delay(500);
+            WiFi.begin(ssid, password);
         }
     }
 
