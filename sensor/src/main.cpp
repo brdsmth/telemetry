@@ -11,6 +11,7 @@
 #include "soil/SoilSensor.h"
 #include "storage/DataLog.h"
 #include "system/Clock.h"
+#include "system/Diagnostics.h"
 #include "system/SystemStatus.h"
 #include "telemetry/Measurement.h"
 #include "version.h"
@@ -22,6 +23,7 @@
 static Config config;
 static DataLog dataLog("/sensor_data.csv", Measurement::csvHeader());
 static SoilSensor* soilSensor = nullptr;
+static Diagnostics diagnostics;
 static unsigned long lastSensorRead = 0;
 
 static Measurement takeMeasurement() {
@@ -47,6 +49,7 @@ void setup() {
     dataLog.begin();
     loadConfig(config);
     printConfig(config);
+    diagnostics.config = &config;
 
     soil::DividerConfig divider = {config.supplyMillivolts, config.seriesResistorOhms};
     soilSensor = new SoilSensor(SOIL_SENSOR_PIN, divider, (uint8_t)config.adcSamples);
@@ -56,7 +59,7 @@ void setup() {
 
     if (config.wifiEnabled && connectToWiFi(WIFI_SSID, WIFI_PASSWORD)) {
         clock_sync::syncNTP();
-        if (config.webServerEnabled) web_portal::begin(dataLog);
+        if (config.webServerEnabled) web_portal::begin(dataLog, diagnostics);
     }
 
     logln("\n === SETUP COMPLETE (" FIRMWARE_VERSION ") ===");
@@ -75,6 +78,7 @@ void loop() {
         logln("\n === INNER LOOP ===");
 
         Measurement m = takeMeasurement();
+        diagnostics.recordReading(m);
 
         if (config.dataLoggingEnabled) {
             dataLog.append(m.toCsv());
@@ -83,8 +87,10 @@ void loop() {
         if (config.httpEnabled && WiFi.status() == WL_CONNECTED) {
             if (m.quality == soil::Quality::Open) {
                 logln("-----> Skipping upload: sensor reads open circuit");
+                diagnostics.recordUploadSkipped();
             } else {
-                postJson(config.httpUrl.c_str(), m.toIngestJson().c_str());
+                int code = postJson(config.httpUrl.c_str(), m.toIngestJson().c_str());
+                diagnostics.recordUpload(code);
             }
         }
 
