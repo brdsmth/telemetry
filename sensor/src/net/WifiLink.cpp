@@ -43,8 +43,10 @@ bool connectToWiFi(const char* ssid, const char* password) {
     WiFi.disconnect(true);
     delay(1000);
 
+    // The scan is only a hint for the log. It is a ~120 ms per channel
+    // snapshot and can miss a weak AP that a connection attempt still reaches.
     logln("-----> Scanning for networks...");
-    int n = WiFi.scanNetworks();
+    int n = WiFi.scanNetworks(false, /*show_hidden=*/true);
     logln("-----> Found " + String(n) + " networks:");
 
     bool networkFound = false;
@@ -59,8 +61,7 @@ bool connectToWiFi(const char* ssid, const char* password) {
     }
 
     if (!networkFound) {
-        logln("ERROR: Target network '" + String(ssid) + "' not found!");
-        return false;
+        logln("-----> WARNING: '" + String(ssid) + "' not seen in scan (2.4 GHz only), trying anyway");
     }
 
     logln("-----> Connecting to " + String(ssid) + "...");
