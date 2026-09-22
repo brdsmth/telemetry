@@ -6,10 +6,10 @@
 
 #include "logger.h"
 
-bool postJson(const char* url, const char* payload) {
+int postJson(const char* url, const char* payload) {
     if (WiFi.status() != WL_CONNECTED) {
         logln("-----> ERROR: WiFi not connected");
-        return false;
+        return HTTPC_ERROR_CONNECTION_REFUSED;
     }
 
     HTTPClient http;
@@ -27,10 +27,10 @@ bool postJson(const char* url, const char* payload) {
         logln("-----> HTTP Response Code: " + String(code));
         logln("-----> Response: " + response);
         http.end();
-        return code >= 200 && code < 300;
+        return code;
     }
 
-    logln("-----> HTTP Request failed, error: " + String(code));
+    logln("-----> HTTP Request failed, error: " + String(code) + " (" + HTTPClient::errorToString(code) + ")");
     http.end();
-    return false;
+    return code;
 }
