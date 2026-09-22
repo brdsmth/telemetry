@@ -1,6 +1,7 @@
 #include "WebPortal.h"
 
 #include <Arduino.h>
+#include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
 
@@ -11,6 +12,9 @@
 namespace web_portal {
 
 static const int kPort = 80;
+// Reachable as http://esp32-sensor.local on networks with mDNS (macOS, iOS,
+// most Linux; Windows needs Bonjour).
+static const char* kMdnsName = "esp32-sensor";
 static WebServer server(kPort);
 static DataLog* dataLog = nullptr;
 static const Diagnostics* diag = nullptr;
@@ -172,6 +176,13 @@ void begin(DataLog& log, const Diagnostics& diagnostics) {
     server.begin();
     logln("-----> Web server started on port " + String(kPort));
     logln("-----> Access at: http://" + WiFi.localIP().toString());
+
+    if (MDNS.begin(kMdnsName)) {
+        MDNS.addService("http", "tcp", kPort);
+        logln("-----> Access at: http://" + String(kMdnsName) + ".local");
+    } else {
+        logln("-----> WARNING: mDNS failed to start");
+    }
     logln("-----> Test endpoint: http://" + WiFi.localIP().toString() + "/test");
 }
 
