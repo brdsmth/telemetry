@@ -55,12 +55,14 @@ void setup() {
     soilSensor = new SoilSensor(SOIL_SENSOR_PIN, divider, (uint8_t)config.adcSamples);
     soilSensor->begin();
 
-    if (config.bleEnabled) ble_link::begin("ESP32");
-
+    // Connect WiFi before starting BLE: both share the radio, and BLE
+    // advertising during association costs auth frames on a weak link.
     if (config.wifiEnabled && connectToWiFi(WIFI_SSID, WIFI_PASSWORD)) {
         clock_sync::syncNTP();
         if (config.webServerEnabled) web_portal::begin(dataLog, diagnostics);
     }
+
+    if (config.bleEnabled) ble_link::begin("ESP32");
 
     logln("\n === SETUP COMPLETE (" FIRMWARE_VERSION ") ===");
 }
