@@ -63,7 +63,8 @@ the board with `make uploadfs` (only needed when the config changes).
 | `web_server_enabled` | Serve the CSV log over HTTP |
 | `data_logging_enabled` | Append readings to the CSV log on flash |
 | `system_status_enabled` | Print heap, RSSI and uptime each cycle |
-| `sensor_interval_ms` | Time between readings |
+| `mode` | `live` reads every 60 s, `development` every 10 s |
+| `sensor_interval_ms` | Optional. Overrides the mode's interval |
 | `node_id` | Sensor identity reported to the API |
 | `depth_cm` | Burial depth reported to the API |
 | `supply_millivolts` | Divider supply, 3300 for the 3V3 pin |
@@ -116,7 +117,20 @@ upgrading from the three-channel firmware), the file is recreated on boot.
 {"node":"soil-1","depth":0,"firmware":"sensor-0.2.0","timestamp":"2026-09-08 12:00:00","adc_raw":1874,"millivolts":1502,"resistance_ohms":83520,"quality":"ok"}
 ```
 
-**Web** at `http://<board-ip>/` lists, downloads and clears the CSV log.
+**Web** at `http://esp32-sensor.local/` (or `http://<board-ip>/`, printed on
+the serial console after "Access at:") is a diagnostics page that refreshes
+every few seconds with:
+
+- the last reading, its age and quality
+- the ingest URL, the last HTTP result and ok / failed / skipped counts
+- WiFi SSID, IP, RSSI and whether the clock has synced
+- free heap, BLE state and the config the board actually loaded
+
+The same data is available as JSON at `/status`. The CSV log can be viewed at
+`/view`, downloaded at `/download` and wiped at `/clear`.
+
+The `.local` name needs mDNS, which macOS, iOS and most Linux desktops have
+built in. Windows needs Bonjour installed.
 
 ## Layout
 
