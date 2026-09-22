@@ -12,7 +12,11 @@ struct Config {
     bool   webServerEnabled     = true;
     bool   dataLoggingEnabled   = true;
     bool   systemStatusEnabled  = true;
-    unsigned long sensorIntervalMs = 10000;
+
+    // "live" reports every 60 s, "development" every 10 s. sensor_interval_ms
+    // in config.json overrides the mode's interval when present.
+    String mode                 = "live";
+    unsigned long sensorIntervalMs = 60000;
 
     // Identity reported to the ingest API
     String nodeId              = "soil-1";
@@ -23,6 +27,9 @@ struct Config {
     float  seriesResistorOhms  = 100000.0f;
     int    adcSamples          = 16;
 };
+
+constexpr unsigned long kLiveIntervalMs        = 60000;
+constexpr unsigned long kDevelopmentIntervalMs = 10000;
 
 // Overwrites cfg with values from /config.json. Missing keys keep their defaults.
 // Returns false if the file is absent or unparsable (cfg is left untouched).

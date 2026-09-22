@@ -7,6 +7,14 @@
 
 static const char* kConfigPath = "/config.json";
 
+static unsigned long intervalForMode(const String& mode) {
+    if (mode == "development") return kDevelopmentIntervalMs;
+    if (mode != "live") {
+        logln("-----> WARNING: unknown mode '" + mode + "', using live interval");
+    }
+    return kLiveIntervalMs;
+}
+
 bool loadConfig(Config& cfg) {
     logln("-----> Loading configuration from SPIFFS...");
 
@@ -37,7 +45,8 @@ bool loadConfig(Config& cfg) {
     cfg.webServerEnabled    = doc["web_server_enabled"]    | cfg.webServerEnabled;
     cfg.dataLoggingEnabled  = doc["data_logging_enabled"]  | cfg.dataLoggingEnabled;
     cfg.systemStatusEnabled = doc["system_status_enabled"] | cfg.systemStatusEnabled;
-    cfg.sensorIntervalMs    = doc["sensor_interval_ms"]    | cfg.sensorIntervalMs;
+    cfg.mode                = doc["mode"]                  | cfg.mode;
+    cfg.sensorIntervalMs    = doc["sensor_interval_ms"]    | intervalForMode(cfg.mode);
     cfg.nodeId              = doc["node_id"]               | cfg.nodeId;
     cfg.depthCm             = doc["depth_cm"]              | cfg.depthCm;
     cfg.supplyMillivolts    = doc["supply_millivolts"]     | cfg.supplyMillivolts;
@@ -59,6 +68,7 @@ void printConfig(const Config& cfg) {
     logln("-----> Web Server Enabled: " + yesNo(cfg.webServerEnabled));
     logln("-----> Data Logging Enabled: " + yesNo(cfg.dataLoggingEnabled));
     logln("-----> System Status Enabled: " + yesNo(cfg.systemStatusEnabled));
+    logln("-----> Mode: " + cfg.mode);
     logln("-----> Sensor Interval: " + String(cfg.sensorIntervalMs) + "ms");
     logln("-----> Node ID: " + cfg.nodeId);
     logln("-----> Depth: " + String(cfg.depthCm) + "cm");

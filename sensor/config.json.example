@@ -6,7 +6,7 @@
   "web_server_enabled": true,
   "data_logging_enabled": true,
   "system_status_enabled": true,
-  "sensor_interval_ms": 10000,
+  "mode": "live",
   "node_id": "soil-1",
   "depth_cm": 0,
   "supply_millivolts": 3300,
