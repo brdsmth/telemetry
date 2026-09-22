@@ -58,7 +58,7 @@ the board with `make uploadfs` (only needed when the config changes).
 |-----|-------------|
 | `wifi_enabled` | Connect to WiFi |
 | `wifi_http_enabled` | POST readings to the API |
-| `wifi_http_url` | Ingest endpoint, e.g. `http://192.168.1.19:8000/ingest` |
+| `wifi_http_url` | Ingest endpoint, e.g. `http://192.168.1.19:8080/ingest` |
 | `ble_enabled` | Advertise readings over Bluetooth |
 | `web_server_enabled` | Serve the CSV log over HTTP |
 | `data_logging_enabled` | Append readings to the CSV log on flash |

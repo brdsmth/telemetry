@@ -7,7 +7,7 @@
 struct Config {
     bool   wifiEnabled          = true;
     bool   httpEnabled          = true;
-    String httpUrl              = "http://192.168.1.19:8000/";
+    String httpUrl              = "http://192.168.1.19:8080/ingest";
     bool   bleEnabled           = true;
     bool   webServerEnabled     = true;
     bool   dataLoggingEnabled   = true;
