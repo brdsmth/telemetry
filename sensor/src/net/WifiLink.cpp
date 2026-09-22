@@ -13,6 +13,7 @@ static const char* disconnectReasonName(uint8_t reason) {
         case 2:   return "auth expired";
         case 8:   return "AP sent disassoc";
         case 15:  return "4-way handshake timeout (wrong password?)";
+        case 39:  return "timeout";
         case 200: return "beacon timeout (weak signal)";
         case 201: return "no AP found";
         case 202: return "auth failed (wrong password?)";
