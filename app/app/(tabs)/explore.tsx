@@ -1,230 +1,121 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, Switch } from 'react-native';
-import { useState } from 'react';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+// Settings: where the server is, whether to use fake sensors, and what the
+// services have been logging. Kept to what the pipeline needs.
+import Constants from 'expo-constants';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+
+import { API_URL_SETTING, DEFAULT_API_URL, FAKE_SENSORS_SETTING, getServices, resetServices, Services } from '@/src/platform/services';
+import { PROTOCOL_VERSION } from '@/src/protocol/record';
 
 export default function SettingsScreen() {
-  const [notifications, setNotifications] = useState(true);
-  const [autoConnect, setAutoConnect] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [services, setServices] = useState<Services | null>(null);
+  const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
+  const [fake, setFake] = useState(false);
+  const [phoneId, setPhoneId] = useState<string>('');
+  const [health, setHealth] = useState<string>('unknown');
+  const [saved, setSaved] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+
+  const load = async () => {
+    const s = await getServices();
+    setServices(s);
+    setApiUrl(s.apiUrl);
+    setFake(s.usingFakeSensors);
+    setPhoneId(await s.upload.phoneId());
+    setLog([...s.log].reverse());
+  };
+
+  useEffect(() => {
+    load().catch((e) => setSaved(String(e)));
+    const t = setInterval(() => {
+      if (services) setLog([...services.log].reverse());
+    }, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services]);
+
+  const save = async () => {
+    if (!services) return;
+    await services.repo.setSetting(API_URL_SETTING, apiUrl.trim().replace(/\/+$/, ''));
+    await services.repo.setSetting(FAKE_SENSORS_SETTING, fake ? 'true' : 'false');
+    resetServices();
+    setSaved('Saved. Services restarted with the new settings.');
+    await load();
+  };
+
+  const checkHealth = async () => {
+    if (!services) return;
+    setHealth('checking…');
+    setHealth((await services.api.health()) ? 'ok' : 'unreachable');
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <ThemedText type="title" style={styles.title}>Settings</ThemedText>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Settings</Text>
+
+      <Text style={styles.label}>API URL</Text>
+      <TextInput
+        style={styles.input}
+        value={apiUrl}
+        onChangeText={setApiUrl}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+      />
+      <View style={styles.row}>
+        <Pressable style={styles.button} onPress={checkHealth}>
+          <Text style={styles.buttonText}>Check health</Text>
+        </Pressable>
+        <Text style={styles.health}>{health}</Text>
       </View>
 
-      {/* App Settings */}
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>General</ThemedText>
-        
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <IconSymbol name="bell.fill" size={24} color="#2B8A3E" style={styles.icon} />
-            <View>
-              <ThemedText style={styles.settingLabel}>Notifications</ThemedText>
-              <ThemedText style={styles.settingDescription}>
-                Alert when moisture drops below threshold
-              </ThemedText>
-            </View>
-          </View>
-          <Switch
-            value={notifications}
-            onValueChange={setNotifications}
-            trackColor={{ false: '#E9ECEF', true: '#51CF66' }}
-            thumbColor="#fff"
-          />
+      <View style={styles.switchRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Use fake sensors</Text>
+          <Text style={styles.dim}>Two in-memory sensors that speak the protocol. For the simulator and web.</Text>
         </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <IconSymbol name="link" size={24} color="#2B8A3E" style={styles.icon} />
-            <View>
-              <ThemedText style={styles.settingLabel}>Auto-Connect</ThemedText>
-              <ThemedText style={styles.settingDescription}>
-                Connect to saved probes automatically
-              </ThemedText>
-            </View>
-          </View>
-          <Switch
-            value={autoConnect}
-            onValueChange={setAutoConnect}
-            trackColor={{ false: '#E9ECEF', true: '#51CF66' }}
-            thumbColor="#fff"
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <IconSymbol name="moon.fill" size={24} color="#2B8A3E" style={styles.icon} />
-            <View>
-              <ThemedText style={styles.settingLabel}>Dark Mode</ThemedText>
-              <ThemedText style={styles.settingDescription}>
-                Use dark theme
-              </ThemedText>
-            </View>
-          </View>
-          <Switch
-            value={darkMode}
-            onValueChange={setDarkMode}
-            trackColor={{ false: '#E9ECEF', true: '#51CF66' }}
-            thumbColor="#fff"
-          />
-        </View>
+        <Switch value={fake} onValueChange={setFake} />
       </View>
 
-      {/* Moisture Thresholds */}
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Moisture Thresholds</ThemedText>
-        <View style={styles.infoCard}>
-          <View style={styles.thresholdRow}>
-            <ThemedText style={styles.thresholdLabel}>🔴 Dry</ThemedText>
-            <ThemedText style={styles.thresholdValue}>Below 30%</ThemedText>
-          </View>
-          <View style={styles.thresholdRow}>
-            <ThemedText style={styles.thresholdLabel}>🟢 Optimal</ThemedText>
-            <ThemedText style={styles.thresholdValue}>30% - 60%</ThemedText>
-          </View>
-          <View style={styles.thresholdRow}>
-            <ThemedText style={styles.thresholdLabel}>💧 Wet</ThemedText>
-            <ThemedText style={styles.thresholdValue}>Above 60%</ThemedText>
-          </View>
-        </View>
-      </View>
+      <Pressable style={styles.buttonPrimary} onPress={save} disabled={!services}>
+        <Text style={styles.buttonText}>Save</Text>
+      </Pressable>
+      {saved && <Text style={styles.saved}>{saved}</Text>}
 
-      {/* About */}
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>About</ThemedText>
-        <TouchableOpacity style={styles.infoCard}>
-          <ThemedText style={styles.infoLabel}>Version</ThemedText>
-          <ThemedText style={styles.infoValue}>1.0.0</ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.infoCard}>
-          <ThemedText style={styles.infoLabel}>Support</ThemedText>
-          <ThemedText style={styles.infoValue}>help@soilmonitor.app</ThemedText>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.section}>About</Text>
+      <Text style={styles.kv}>phone id  {phoneId}</Text>
+      <Text style={styles.kv}>app       {Constants.expoConfig?.version ?? '?'}</Text>
+      <Text style={styles.kv}>protocol  v{PROTOCOL_VERSION}</Text>
 
-      <View style={styles.footer}>
-        <ThemedText style={styles.footerText}>
-          Soil Moisture Monitoring System
-        </ThemedText>
-        <ThemedText style={styles.footerText}>
-          Built for farmers, by farmers
-        </ThemedText>
-      </View>
+      <Text style={styles.section}>Log</Text>
+      {log.length === 0 ? (
+        <Text style={styles.dim}>Nothing yet.</Text>
+      ) : (
+        log.map((line, i) => (
+          <Text key={i} style={styles.logLine}>
+            {line}
+          </Text>
+        ))
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9ECEF',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2B8A3E',
-  },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#868E96',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  icon: {
-    width: 24,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2,
-  },
-  settingDescription: {
-    fontSize: 13,
-    color: '#868E96',
-  },
-  infoCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  thresholdRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  thresholdLabel: {
-    fontSize: 15,
-    color: '#212529',
-  },
-  thresholdValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#495057',
-  },
-  infoLabel: {
-    fontSize: 15,
-    color: '#868E96',
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  footerText: {
-    fontSize: 13,
-    color: '#ADB5BD',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  screen: { flex: 1, backgroundColor: '#f4f5f7' },
+  content: { padding: 16, paddingTop: 56, paddingBottom: 40, gap: 10 },
+  title: { fontSize: 26, fontWeight: '700', color: '#1b1f24' },
+  label: { fontSize: 13, fontWeight: '600', color: '#57606a' },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d0d7de', borderRadius: 8, padding: 10, fontFamily: 'Menlo', fontSize: 13 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  button: { backgroundColor: '#e6e8eb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
+  buttonPrimary: { backgroundColor: '#1f6feb', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  buttonText: { color: '#1b1f24', fontWeight: '600' },
+  health: { color: '#57606a' },
+  saved: { color: '#1a7f37' },
+  section: { marginTop: 14, fontSize: 13, fontWeight: '600', color: '#6e7781', textTransform: 'uppercase', letterSpacing: 0.6 },
+  kv: { fontFamily: 'Menlo', fontSize: 12, color: '#1b1f24' },
+  dim: { color: '#6e7781', fontSize: 12 },
+  logLine: { fontFamily: 'Menlo', fontSize: 11, color: '#57606a' },
 });
