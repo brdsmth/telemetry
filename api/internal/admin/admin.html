@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Telemetry admin</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#262b35; --fg:#d7dbe2; --dim:#8a93a3; --ok:#5ec27a; --warn:#e2b04a; --bad:#e0645c; --link:#7cb3ff; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f6f7f9; --panel:#fff; --line:#e1e4ea; --fg:#1c2027; --dim:#6b7380; --link:#1a5fb4; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  header { display:flex; flex-wrap:wrap; gap:12px 24px; align-items:baseline; padding:14px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  header .meta { color:var(--dim); }
+  main { padding:8px 16px 40px; max-width:1400px; }
+  section { margin-top:22px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:0 0 8px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:auto; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; }
+  th { color:var(--dim); font-weight:500; position:sticky; top:0; background:var(--panel); }
+  tr:last-child td { border-bottom:0; }
+  td.num, th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  a, .link { color:var(--link); cursor:pointer; text-decoration:none; }
+  .empty { color:var(--dim); padding:10px; }
+  #err { color:var(--bad); padding:8px 0; }
+  .id { color:var(--dim); }
+  .row-sel td { background: rgba(124,179,255,.08); }
+  button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:4px 10px; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Telemetry admin</h1>
+  <span class="meta" id="health">health: …</span>
+  <span class="meta" id="stamp"></span>
+  <span class="meta">protocol v<span id="pv">?</span></span>
+  <button id="tokenBtn" title="Set the admin token">token</button>
+</header>
+<main>
+  <div id="err"></div>
+
+  <section>
+    <h2>Devices <span class="id">readings held by the server, by device</span></h2>
+    <div class="panel"><table id="devices"></table></div>
+  </section>
+
+  <section>
+    <h2>Readings <span class="id" id="readingsFor">select a device</span></h2>
+    <div class="panel"><table id="readings"></table></div>
+  </section>
+
+  <section>
+    <h2>Recent batches <span class="id">one per upload request</span></h2>
+    <div class="panel"><table id="batches"></table></div>
+  </section>
+
+  <section>
+    <h2>Recent sessions <span class="id">one per BLE connection</span></h2>
+    <div class="panel"><table id="sessions"></table></div>
+  </section>
+
+  <section>
+    <h2>Bench feed <span class="id">legacy POST /ingest, one row per reading</span></h2>
+    <div class="panel"><table id="legacy"></table></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const short = s => s ? `<span class="id" title="${esc(s)}">${esc(String(s).slice(0, 8))}</span>` : '';
+const when = t => t ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) : '<span class="id">unknown</span>';
+const ago = t => { if (!t) return ''; const s = Math.max(0, (Date.now() - new Date(t)) / 1000); return s < 90 ? `${Math.round(s)}s ago` : s < 5400 ? `${Math.round(s/60)}m ago` : `${(s/3600).toFixed(1)}h ago`; };
+let selected = null;
+
+function token() { try { return localStorage.getItem('admin_token') || ''; } catch { return ''; } }
+function setToken() { const t = prompt('Admin token (leave blank to clear)', token()); if (t === null) return; try { localStorage.setItem('admin_token', t); } catch {} refresh(); }
+$('tokenBtn').onclick = setToken;
+
+async function api(path) {
+  const h = token() ? { Authorization: 'Bearer ' + token() } : {};
+  const r = await fetch(path, { headers: h, cache: 'no-store' });
+  if (r.status === 401) { throw new Error('unauthorized: set the admin token'); }
+  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+  return r.json();
+}
+
+function table(id, cols, rows, rowAttrs) {
+  const el = $(id);
+  if (!rows || rows.length === 0) { el.innerHTML = `<tr><td class="empty" colspan="${cols.length}">nothing yet</td></tr>`; return; }
+  const head = '<tr>' + cols.map(c => `<th class="${c.num ? 'num' : ''}">${c.h}</th>`).join('') + '</tr>';
+  const body = rows.map(r => `<tr ${rowAttrs ? rowAttrs(r) : ''}>` + cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.f(r)}</td>`).join('') + '</tr>').join('');
+  el.innerHTML = head + body;
+}
+
+function renderDevices(devices) {
+  table('devices', [
+    { h: 'device', f: d => `<span class="link" onclick="selectDevice('${esc(d.device_id)}')">${esc(d.device_id)}</span>` },
+    { h: 'readings', num: true, f: d => d.reading_count },
+    { h: 'seq range', num: true, f: d => `${d.min_seq} – ${d.max_seq}` },
+    { h: 'last recorded', f: d => when(d.last_recorded_at) },
+    { h: 'last received', f: d => `${when(d.last_received_at)} <span class="id">${ago(d.last_received_at)}</span>` },
+    { h: 'batches', num: true, f: d => d.batches },
+    { h: 'sessions', num: true, f: d => d.sessions },
+  ], devices, d => d.device_id === selected ? 'class="row-sel"' : '');
+  if (!selected && devices.length) selectDevice(devices[0].device_id);
+}
+
+async function selectDevice(id) {
+  selected = id;
+  $('readingsFor').textContent = id + ', newest first';
+  try {
+    const d = await api(`/v1/admin/devices/${encodeURIComponent(id)}/readings?limit=200`);
+    table('readings', [
+      { h: 'seq', num: true, f: r => r.seq },
+      { h: 'type', f: r => esc(d.names.types[r.type] || r.type) },
+      { h: 'value', num: true, f: r => Number(r.value).toLocaleString(undefined, { maximumFractionDigits: 2 }) },
+      { h: 'quality', f: r => { const q = d.names.qualities[r.quality] || r.quality; return `<span class="${q === 'ok' ? 'ok' : q === 'open' ? 'bad' : 'warn'}">${esc(q)}</span>`; } },
+      { h: 'recorded at', f: r => when(r.recorded_at) },
+      { h: 'time source', f: r => `<span class="${r.time_source === 'sensor' ? 'ok' : r.time_source === 'phone_backfill' ? 'warn' : 'bad'}">${esc(r.time_source)}</span>` },
+      { h: 'raw time', num: true, f: r => r.raw_time },
+      { h: 'boot', num: true, f: r => r.boot_id },
+      { h: 'batch', f: r => short(r.batch_id) },
+      { h: 'received', f: r => when(r.received_at) },
+    ], d.readings);
+    for (const tr of $('devices').querySelectorAll('tr')) tr.classList.toggle('row-sel', tr.textContent.startsWith(id));
+  } catch (e) { $('err').textContent = e.message; }
+}
+
+function renderBatches(b) {
+  table('batches', [
+    { h: 'received', f: x => `${when(x.received_at)} <span class="id">${ago(x.received_at)}</span>` },
+    { h: 'device', f: x => esc(x.device_id) },
+    { h: 'records', num: true, f: x => x.record_count },
+    { h: 'inserted', num: true, f: x => x.inserted_count },
+    { h: 'rejected', num: true, f: x => x.rejected_count ? `<span class="bad">${x.rejected_count}</span>` : '0' },
+    { h: 'batch', f: x => short(x.batch_id) },
+    { h: 'session', f: x => short(x.session_id) },
+  ], b);
+}
+
+function renderSessions(s) {
+  table('sessions', [
+    { h: 'last seen', f: x => `${when(x.last_seen)} <span class="id">${ago(x.last_seen)}</span>` },
+    { h: 'device', f: x => esc(x.device_id) },
+    { h: 'phone', f: x => short(x.phone_id) },
+    { h: 'phone time at connect', f: x => when(x.phone_time_at_connect) },
+    { h: 'sensor uptime', num: true, f: x => x.sensor_uptime_at_connect ?? '' },
+    { h: 'sensor boot', num: true, f: x => x.sensor_boot_id_at_connect ?? '' },
+    { h: 'session', f: x => short(x.session_id) },
+  ], s);
+}
+
+function renderLegacy(l) {
+  table('legacy', [
+    { h: 'timestamp', f: x => `${when(x.timestamp)} <span class="id">${ago(x.timestamp)}</span>` },
+    { h: 'node', f: x => esc(x.node) },
+    { h: 'type', f: x => esc(x.type) },
+    { h: 'value', num: true, f: x => Number(x.value).toLocaleString() },
+    { h: 'firmware', f: x => esc(x.firmware) },
+    { h: 'depth', num: true, f: x => x.depth },
+  ], l);
+}
+
+async function refresh() {
+  try {
+    const h = await fetch('/healthz', { cache: 'no-store' });
+    $('health').innerHTML = h.ok ? '<span class="ok">health: ok</span>' : `<span class="bad">health: ${h.status}</span>`;
+    const o = await api('/v1/admin/overview');
+    $('err').textContent = '';
+    $('pv').textContent = o.protocol_version;
+    $('stamp').textContent = 'as of ' + when(o.generated_at) + ' UTC';
+    renderDevices(o.devices);
+    renderBatches(o.batches);
+    renderSessions(o.sessions);
+    renderLegacy(o.legacy);
+    if (selected) selectDevice(selected);
+  } catch (e) { $('err').textContent = e.message; }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

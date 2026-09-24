@@ -3,6 +3,7 @@
 //	POST /v1/batches  upload envelope from a phone (schema/PROTOCOL.md §4)
 //	POST /ingest      legacy one-reading JSON from the bench firmware
 //	GET  /healthz     200 when Postgres answers
+//	GET  /admin       minimal read-only page over the JSON under /v1/admin/
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"api/internal/admin"
 	"api/internal/ingest"
 	"api/internal/store"
 )
@@ -44,6 +46,12 @@ func main() {
 	mux.HandleFunc("/healthz", ingest.Healthz(st))
 	mux.HandleFunc("/ingest", ingest.Legacy(st, logger))
 	mux.HandleFunc("/v1/batches", ingest.Batches(st, logger))
+	// ADMIN_TOKEN guards the admin JSON; leave it unset only for local runs.
+	adminToken := os.Getenv("ADMIN_TOKEN")
+	if adminToken == "" {
+		logger.Println("ADMIN_TOKEN not set: admin endpoints are open")
+	}
+	admin.New(st, adminToken, logger).Register(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
