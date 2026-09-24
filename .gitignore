@@ -14,3 +14,4 @@ minimal/
 # WiFi credentials
 wifi.json
 sensor/wifi_config.h
+.gstack/
