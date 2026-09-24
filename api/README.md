@@ -11,6 +11,8 @@ Railway from `Dockerfile` with the service settings in `railway.json`.
 | POST   | `/v1/batches`  | Upload envelope from a phone, [`schema/PROTOCOL.md` §4](../schema/PROTOCOL.md). Idempotent on `(device_id, seq)`; answers with acked seq ranges. |
 | POST   | `/ingest`      | Legacy one-reading JSON from the bench firmware. Answers `202 ok`.   |
 | GET    | `/healthz`     | `200 ok` when Postgres answers, else `503`.                          |
+| GET    | `/admin`       | Minimal read-only page: devices, readings, batches, sessions, bench feed. |
+| GET    | `/v1/admin/overview`, `/v1/admin/devices/{id}/readings` | JSON behind the page. Require `Authorization: Bearer $ADMIN_TOKEN` when `ADMIN_TOKEN` is set. |
 
 ## Layout
 
@@ -18,6 +20,7 @@ Railway from `Dockerfile` with the service settings in `railway.json`.
 cmd/api/          main: config, wiring, HTTP server
 internal/schema/  record codec, tested against schema/vectors
 internal/ingest/  handlers: batches, legacy, healthz
+internal/admin/   read-only admin page and its JSON endpoints
 internal/store/   Store interface, Postgres implementation, in-memory store for tests
 ```
 
@@ -51,3 +54,5 @@ curl https://api-production-2e52.up.railway.app/healthz
 ```
 
 `DATABASE_URL` on the service is the reference `${{Postgres.DATABASE_URL}}`.
+`ADMIN_TOKEN` guards the admin JSON; read it with `railway variable list --service api`
+and paste it into the page's token prompt once.
