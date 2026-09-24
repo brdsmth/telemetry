@@ -9,7 +9,7 @@ type(scope): description
 ```
 
 - **type** is one of `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `ci`, `build`, `style`.
-- **scope** is the area of the repo the change touches. Use the existing scopes: `api`, `app`, `gateway`, `sensor`, `lib`, `schema`, `infra`, `db`, `ingester`, `dev`. Add a new scope only when a change clearly belongs to a new area.
+- **scope** is the area of the repo the change touches. Use the existing scopes: `api`, `app`, `gateway`, `sensor`, `lib`, `schema`, `db`, `ingester`, `dev`. Add a new scope only when a change clearly belongs to a new area.
 - **description** is a short, lowercase, imperative summary with no trailing period.
 
 Examples from this repo:

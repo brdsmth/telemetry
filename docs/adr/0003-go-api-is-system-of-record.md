@@ -20,9 +20,9 @@ batch envelope to the same endpoint.
 
 The Go API and its Postgres run on Railway, in the `telemetry` project, with
 the API built from `api/Dockerfile` and configured by `api/railway.json`. The
-AWS event pipeline is not extended and `infra/` is slated for removal once
-nothing references it. If a managed ingress is wanted later it sits in front
-of the Go API rather than beside it.
+AWS event pipeline is not extended and the `infra/` Pulumi code is removed
+(the AWS resources it created are torn down separately). If a managed ingress
+is wanted later it sits in front of the Go API rather than beside it.
 
 ## Alternatives considered
 
@@ -35,8 +35,9 @@ of the Go API rather than beside it.
 ## Consequences
 
 - One schema, one set of integration tests, one place to add tracing.
-- `infra/index.ts` with its hardcoded account and resource ids is slated for
-  removal.
+- `infra/index.ts` with its hardcoded account and resource ids is gone;
+  the gateway's hardcoded `api.autostrux.com` ingest URL still points at that
+  stack and changes when the gateway work resumes.
 - Deployment configuration lives with the service (`api/railway.json`) rather
   than in a separate infrastructure tree.
 - The gateway's `Telemetry` struct is replaced by the shared record format
