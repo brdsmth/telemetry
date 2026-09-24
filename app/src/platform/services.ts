@@ -6,13 +6,13 @@ import { Platform } from 'react-native';
 
 import { ApiClient, FetchApiClient } from '../net/ApiClient';
 import { Repository } from '../store/Repository';
-import { SqliteRepository } from '../store/SqliteRepository';
 import { CollectionService } from '../sync/CollectionService';
 import { SyncDeps } from '../sync/deps';
 import { UploadService } from '../sync/UploadService';
 import { FakeSensor } from '../transport/FakeSensor';
 import { FakeTransport } from '../transport/FakeTransport';
 import { SensorTransport } from '../transport/SensorTransport';
+import { createRepository } from './repository';
 
 export const DEFAULT_API_URL = 'https://api-production-2e52.up.railway.app';
 export const API_URL_SETTING = 'api_url';
@@ -44,7 +44,7 @@ export function resetServices(): void {
 }
 
 async function build(): Promise<Services> {
-  const repo = new SqliteRepository();
+  const repo = createRepository();
   await repo.init();
 
   const log: string[] = [];
