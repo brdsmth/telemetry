@@ -1,7 +1,12 @@
 # ESP32 Soil Sensor
 
 Reads a homemade gypsum block soil moisture sensor through a voltage divider,
-logs each reading to flash, and reports it to the telemetry API over WiFi.
+stores every reading in a flash ring, and serves the stored readings to a
+phone over the BLE sync service. On the bench it also logs a CSV and posts
+each reading to the API over WiFi.
+
+The store-and-forward design is in [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md);
+the byte formats are in [`schema/PROTOCOL.md`](../schema/PROTOCOL.md).
 
 ## Wiring
 
@@ -25,7 +30,7 @@ resistance in ohms:
 R_sensor = 100k * V_adc / (3.3 V - V_adc)
 ```
 
-Resistance is what gets logged and uploaded. Converting resistance to a
+Resistance is what gets stored and uploaded. Converting resistance to a
 moisture percentage needs a calibration curve for your specific block, which
 is a later step.
 
@@ -40,11 +45,11 @@ Each reading is flagged with a quality:
 
 ## Prerequisites
 - PlatformIO CLI (`pip install platformio`)
-- ESP32 dev board (only for flashing; the math can be tested without one)
+- ESP32 dev board (only for flashing; the core can be tested without one)
 
 ## Setup
 
-### 1. WiFi credentials
+### 1. WiFi credentials (bench only)
 
 Copy `env.example` to `.env` and fill in your SSID and password. The Makefile
 loads `.env` when building and bakes the values into the firmware.
@@ -52,24 +57,26 @@ loads `.env` when building and bakes the values into the firmware.
 ### 2. Configuration
 
 Copy `config.json.example` to `data/config.json` and edit it, then upload it to
-the board with `make uploadfs` (only needed when the config changes).
+the board with `make uploadfs` (only needed when the config changes; this
+rewrites the whole LittleFS image, including the CSV log and the ring).
 
 | key | description |
 |-----|-------------|
 | `wifi_enabled` | Connect to WiFi |
 | `wifi_http_enabled` | POST readings to the API |
-| `wifi_http_url` | Ingest endpoint, e.g. `http://192.168.1.19:8080/ingest` |
-| `ble_enabled` | Advertise readings over Bluetooth |
-| `web_server_enabled` | Serve the CSV log over HTTP |
+| `wifi_http_url` | Ingest endpoint, e.g. `https://api-production-2e52.up.railway.app/ingest` |
+| `ble_enabled` | Run the BLE sync service |
+| `web_server_enabled` | Serve the diagnostics page over HTTP |
 | `data_logging_enabled` | Append readings to the CSV log on flash |
 | `system_status_enabled` | Print heap, RSSI and uptime each cycle |
 | `mode` | `live` reads every 60 s, `development` every 10 s |
 | `sensor_interval_ms` | Optional. Overrides the mode's interval |
-| `node_id` | Sensor identity reported to the API |
+| `node_id` | Legacy identity for the bench POST. BLE uses the MAC |
 | `depth_cm` | Burial depth reported to the API |
 | `supply_millivolts` | Divider supply, 3300 for the 3V3 pin |
 | `series_resistor_ohms` | Value of the series resistor |
 | `adc_samples` | Samples per reading; the median is used (max 32) |
+| `ring_slots` | Records kept on flash, 20 bytes each. 8192 is 160 KB, ~5.7 days at 60 s |
 
 ## Commands
 
@@ -80,79 +87,99 @@ make upload    # Flash the ESP32
 make uploadfs  # Upload data/config.json to the ESP32
 make monitor   # Open the serial monitor (115200 baud)
 make clean     # Clean build files
+make erase     # Erase the whole flash (also wipes the ring and NVS cursor)
 make all       # Build, upload and monitor
 ```
 
 ## Developing without a board
 
-- `make test` runs the divider math in `src/soil/soil_math.cpp` natively on
-  your machine using PlatformIO's Unity runner. Tests live in
-  `test/test_soil_math/`.
+- `make test` runs the `native` environment: the divider math plus everything
+  in `lib/telemetry-core` (record codec, ring store, BLE codec, sync session)
+  against the golden vectors in `schema/vectors`. Tests live in `test/`.
 - `make build` compiles the full firmware for the ESP32 without needing one
   attached, which catches everything except runtime behaviour.
 
+## Exercising the board from a laptop
+
+```bash
+PY=/opt/homebrew/Cellar/platformio/*/libexec/bin/python   # has pyserial and bleak
+$PY ../scripts/hil/serial_capture.py --seconds 90         # reset and watch the boot
+$PY ../scripts/hil/ble_probe.py scan                      # who is advertising
+$PY ../scripts/hil/ble_probe.py pull --ack-collected      # pull records like the app will
+```
+
 ## Outputs
 
-**HTTP** posts one record per reading, matching the API's ingest schema:
+**Flash ring** at `/ring.bin`: fixed 20-byte records, see the protocol doc.
+The cursor (next seq, oldest kept, collected and secured watermarks, dropped
+count) lives in NVS and survives reboots. Records are only freed when a phone
+reports them secured on the server.
+
+**BLE** advertises as `TLM-XXXXXX` (last three MAC bytes) with the telemetry
+service UUID and a manufacturer data field holding the pending record count,
+battery and flags. Connected phones read Device Info, open a session, set the
+clock, pull records from a sequence number as CRC-checked chunks, and
+acknowledge. Details in `schema/PROTOCOL.md` §3.
+
+**HTTP** (bench) posts one record per reading, matching the API's legacy
+ingest schema:
 
 ```json
-{"node":"soil-1","depth":0,"firmware":"sensor-0.2.0","timestamp":1757289600,"value":83520,"type":"soil_resistance_ohms"}
+{"node":"soil-1","depth":0,"firmware":"sensor-0.3.0","timestamp":1757289600,"value":83520,"type":"soil_resistance_ohms"}
 ```
 
 `timestamp` is 0 until NTP has synced; the API fills in server time.
 
-**CSV** on flash at `/sensor_data.csv`:
+**CSV** (bench) on flash at `/sensor_data.csv`:
 
 ```
 timestamp,adc_raw,millivolts,resistance_ohms,quality
 2026-09-08 12:00:00,1874,1502,83520,ok
 ```
 
-If the header does not match what the firmware expects (for example after
-upgrading from the three-channel firmware), the file is recreated on boot.
+If the header does not match what the firmware expects, the file is recreated
+on boot.
 
-**BLE** exposes the full reading as JSON on a read/notify characteristic:
-
-```json
-{"node":"soil-1","depth":0,"firmware":"sensor-0.2.0","timestamp":"2026-09-08 12:00:00","adc_raw":1874,"millivolts":1502,"resistance_ohms":83520,"quality":"ok"}
-```
-
-**Web** at `http://esp32-sensor.local/` (or `http://<board-ip>/`, printed on
-the serial console after "Access at:") is a diagnostics page that refreshes
-every few seconds with:
-
-- the last reading, its age and quality
-- the ingest URL, the last HTTP result and ok / failed / skipped counts
-- WiFi SSID, IP, RSSI and whether the clock has synced
-- free heap, BLE state and the config the board actually loaded
-
-The same data is available as JSON at `/status`. The CSV log can be viewed at
-`/view`, downloaded at `/download` and wiped at `/clear`.
-
-The `.local` name needs mDNS, which macOS, iOS and most Linux desktops have
-built in. Windows needs Bonjour installed.
+**Web** (bench) at `http://esp32-sensor.local/` (or `http://<board-ip>/`) is a
+diagnostics page with the last reading, upload results, WiFi and BLE state,
+and the loaded config. JSON at `/status`; CSV at `/view`, `/download`,
+`/clear`.
 
 ## Layout
 
 ```
 src/
-  main.cpp               wiring and the read/log/upload loop
-  config.*               /config.json loader
-  version.h              FIRMWARE_VERSION
-  soil/soil_math.*       pure divider math (host-testable)
-  soil/SoilSensor.*      ADC sampling on the ESP32
-  telemetry/Measurement.* one reading and its CSV / JSON forms
-  storage/DataLog.*      CSV log on SPIFFS
-  net/WifiLink.*         WiFi connect
-  net/Uplink.*           HTTP POST
-  net/WebPortal.*        HTTP UI for the log
-  net/BleLink.*          BLE GATT server
-  system/Clock.*         NTP time
-  system/SystemStatus.*  heap / RSSI / uptime logging
-test/test_soil_math/     host unit tests
+  main.cpp                    wiring and the read/store/upload loop
+  config.*                    /config.json loader
+  version.h                   FIRMWARE_VERSION
+  soil/soil_math.*            pure divider math (host-testable)
+  soil/SoilSensor.*           ADC sampling on the ESP32
+  telemetry/Measurement.*     one reading and its CSV / JSON forms (bench)
+  storage/DataLog.*           CSV log on LittleFS (bench)
+  platform/esp32/
+    LittleFsSlotStorage.*     ring slots in a file
+    NvsCursorStore.*          ring cursor in NVS
+    Esp32System.*             MAC id, boot counter, RTC clock
+    NimBleSyncTransport.*     BLE sync service on NimBLE
+  net/WifiLink.*              WiFi connect (bench)
+  net/Uplink.*                HTTP POST (bench)
+  net/WebPortal.*             HTTP diagnostics (bench)
+  system/Clock.*              NTP time (bench)
+  system/Diagnostics.*        state for the web portal
+  system/SystemStatus.*       heap / RSSI / uptime logging
+test/                         host unit tests, one directory per subject
+../lib/telemetry-core/        the hardware independent core
 ```
 
 ## Notes
+
+### Time in the field
+
+Without WiFi the board has no clock until a phone connects and sends
+`SET_TIME`. Until then records carry seconds since boot and the boot id, and
+the phone back-fills wall-clock time for records from the boot it connected
+in. The RTC keeps time through deep sleep, so one visit sets it until the next
+power loss.
 
 ### DC excitation and gypsum blocks
 
@@ -165,5 +192,6 @@ The `SoilSensor` class is the place to add that.
 
 ### Power
 
-Currently everything is always on. See the git history of this README for the
-earlier list of deep-sleep and battery ideas; they still apply.
+Everything is still always on. The field build with deep sleep and an
+advertising duty cycle is the next step; see the roadmap in the architecture
+document.
