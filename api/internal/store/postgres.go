@@ -180,3 +180,128 @@ func nullableUint16(v *uint16) *int32 {
 	x := int32(*v)
 	return &x
 }
+
+// --- admin read side ---
+
+func (p *Postgres) ListDevices(ctx context.Context) ([]DeviceSummary, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT r.device_id, count(*), min(r.seq), max(r.seq), max(r.recorded_at), max(r.received_at),
+		       (SELECT count(*) FROM batches b WHERE b.device_id = r.device_id),
+		       (SELECT count(*) FROM sessions s WHERE s.device_id = r.device_id)
+		FROM readings r
+		GROUP BY r.device_id
+		ORDER BY max(r.received_at) DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []DeviceSummary{}
+	for rows.Next() {
+		var d DeviceSummary
+		var minSeq, maxSeq int64
+		if err := rows.Scan(&d.DeviceID, &d.ReadingCount, &minSeq, &maxSeq, &d.LastRecordedAt,
+			&d.LastReceivedAt, &d.Batches, &d.Sessions); err != nil {
+			return nil, err
+		}
+		d.MinSeq, d.MaxSeq = uint32(minSeq), uint32(maxSeq)
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) ListReadings(ctx context.Context, deviceID string, limit int) ([]ReadingRow, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT seq, type, quality, flags, raw_time, boot_id, value, recorded_at, time_source, batch_id, received_at
+		FROM readings WHERE device_id = $1 ORDER BY seq DESC LIMIT $2`, deviceID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ReadingRow{}
+	for rows.Next() {
+		var r ReadingRow
+		var seq, rawTime int64
+		var typ, quality, flags int16
+		var boot int32
+		var value float64
+		if err := rows.Scan(&seq, &typ, &quality, &flags, &rawTime, &boot, &value, &r.RecordedAt,
+			&r.TimeSource, &r.BatchID, &r.ReceivedAt); err != nil {
+			return nil, err
+		}
+		r.Seq, r.RawTime = uint32(seq), uint32(rawTime)
+		r.Type, r.Quality, r.Flags = uint8(typ), uint8(quality), uint8(flags)
+		r.BootID, r.Value = uint16(boot), float32(value)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) ListSessions(ctx context.Context, limit int) ([]SessionRow, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT session_id, device_id, COALESCE(phone_id, ''), phone_time_at_connect,
+		       sensor_uptime_at_connect, sensor_boot_id_at_connect, first_seen, last_seen
+		FROM sessions ORDER BY last_seen DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SessionRow{}
+	for rows.Next() {
+		var s SessionRow
+		var uptime *int64
+		var boot *int32
+		if err := rows.Scan(&s.SessionID, &s.DeviceID, &s.PhoneID, &s.PhoneTimeAtConnect,
+			&uptime, &boot, &s.FirstSeen, &s.LastSeen); err != nil {
+			return nil, err
+		}
+		if uptime != nil {
+			u := uint32(*uptime)
+			s.SensorUptimeAtConnect = &u
+		}
+		if boot != nil {
+			b := uint16(*boot)
+			s.SensorBootIDAtConnect = &b
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) ListBatches(ctx context.Context, limit int) ([]BatchRow, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT batch_id, session_id, device_id, received_at, record_count, inserted_count, rejected_count
+		FROM batches ORDER BY received_at DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []BatchRow{}
+	for rows.Next() {
+		var b BatchRow
+		if err := rows.Scan(&b.BatchID, &b.SessionID, &b.DeviceID, &b.ReceivedAt,
+			&b.RecordCount, &b.InsertedCount, &b.RejectedCount); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (p *Postgres) ListLegacy(ctx context.Context, limit int) ([]LegacyRow, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, node, type, depth, firmware, value, timestamp
+		FROM incoming_raw ORDER BY id DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []LegacyRow{}
+	for rows.Next() {
+		var r LegacyRow
+		if err := rows.Scan(&r.ID, &r.Node, &r.Type, &r.Depth, &r.Firmware, &r.Value, &r.Timestamp); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
