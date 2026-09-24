@@ -183,9 +183,10 @@ const BluetoothDemoScreen: React.FC = () => {
       }
     );
 
-    // Stop scan after timeout
+    // Stop scan after timeout. Do not read isScanning here: this closure was
+    // created in the render where it was still false.
     setTimeout(() => {
-      if (bleManagerRef.current && isScanning) {
+      if (bleManagerRef.current) {
         bleManagerRef.current.stopDeviceScan();
         setIsScanning(false);
         addDebugLog("Scan stopped");
