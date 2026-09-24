@@ -160,12 +160,16 @@ Total 54 bytes.
 ### 3.3 Control commands (write)
 
 First byte is the opcode. Every command is answered by a Status notification.
+Payloads are exact length: a command of any other length, or with an unknown
+opcode, is answered with `bad_argument` and the first byte echoed as `opcode`.
+Every command except `OPEN_SESSION` needs an open session; otherwise the
+answer is `no_session`.
 
 | Opcode | Name             | Payload                          | Effect                                              |
 |-------:|------------------|----------------------------------|-----------------------------------------------------|
 | `0x01` | `OPEN_SESSION`   | `session_id` 16 bytes            | Starts a session; resets chunk state.               |
-| `0x02` | `SET_TIME`       | `unix_time` u32                  | Sets the RTC and persists the offset.               |
-| `0x03` | `READ_FROM`      | `seq` u32, `max_records` u16     | Streams records with `seq >= from` as Data chunks.  |
+| `0x02` | `SET_TIME`       | `unix_time` u32                  | Sets the RTC and persists the offset. `0` is `bad_argument`. |
+| `0x03` | `READ_FROM`      | `seq` u32, `max_records` u16     | Streams records with `seq >= from` as Data chunks. `max_records = 0` means all. Replaces a stream in progress. A `seq` below the oldest stored record is clamped; Status `seq` reports the start. |
 | `0x04` | `ACK_COLLECTED`  | `through_seq` u32                | Advances `collected_through`. Frees nothing.        |
 | `0x05` | `ACK_SECURED`    | `through_seq` u32                | Advances `secured_through`; frees slots.            |
 | `0x06` | `CLOSE_SESSION`  | none                             | Ends the session; sensor may return to sleep.       |
@@ -175,13 +179,15 @@ First byte is the opcode. Every command is answered by a Status notification.
 | Offset | Size | Field       | Meaning                                           |
 |-------:|-----:|-------------|---------------------------------------------------|
 |      0 |    4 | `first_seq` | `seq` of the first record in this chunk.          |
-|      4 |    1 | `count`     | Number of records, 1..24.                         |
+|      4 |    1 | `count`     | Number of records, 0..24. 0 only with `last` set.  |
 |      5 |    1 | `flags`     | bit 0: last chunk for this `READ_FROM`.           |
 |      6 |    2 | `crc`       | CRC-16/CCITT-FALSE over the record bytes.         |
 |      8 | 20·n | records     | `count` consecutive records.                      |
 
 Records within a chunk have consecutive `seq` values. Gaps are the phone's
-signal that records were dropped; the sensor never fabricates fillers.
+signal that records were dropped; the sensor never fabricates fillers. A chunk
+with `count = 0` carries `last` and means nothing is stored at or after
+`first_seq`. Records are sent in order until a chunk with `last` arrives.
 
 ### 3.5 Status (read / notify)
 
