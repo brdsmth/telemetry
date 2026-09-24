@@ -19,8 +19,8 @@ is in [`docs/TESTING.md`](./docs/TESTING.md). Decisions are recorded in
 | `sensor/`   | ESP32 soil sensor firmware                                  |
 | `gateway/`  | ESP32-S3 + SIM7670G cellular gateway firmware (parked)      |
 | `app/`      | Expo / React Native mobile app                              |
-| `api/`      | Go HTTP API backed by Postgres                              |
-| `infra/`    | Deployment                                                  |
+| `api/`      | Go HTTP API backed by Postgres, deployed on Railway         |
+| `infra/`    | Legacy AWS experiment, slated for removal                   |
 | `docs/`     | Architecture, testing, ADRs                                 |
 
 ## Working on it
