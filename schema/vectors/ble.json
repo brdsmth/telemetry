@@ -1,0 +1,277 @@
+{
+  "format": "ble",
+  "protocol_version": 1,
+  "service_uuid": "6eaedc54-f770-40e3-9806-a6ccf63c8099",
+  "characteristics": {
+    "device_info": "6eaedc54-f770-40e3-0001-a6ccf63c8099",
+    "control": "6eaedc54-f770-40e3-0002-a6ccf63c8099",
+    "data": "6eaedc54-f770-40e3-0003-a6ccf63c8099",
+    "status": "6eaedc54-f770-40e3-0004-a6ccf63c8099"
+  },
+  "sizes": {
+    "advertising": 6,
+    "device_info": 54,
+    "status": 6,
+    "chunk_header": 8,
+    "max_records_per_chunk": 24
+  },
+  "opcodes": {
+    "OPEN_SESSION": 1,
+    "SET_TIME": 2,
+    "READ_FROM": 3,
+    "ACK_COLLECTED": 4,
+    "ACK_SECURED": 5,
+    "CLOSE_SESSION": 6
+  },
+  "results": {
+    "ok": 0,
+    "no_session": 1,
+    "bad_argument": 2,
+    "seq_out_of_range": 3,
+    "busy": 4
+  },
+  "advertising": [
+    {
+      "name": "idle_no_time",
+      "fields": {
+        "protocol_version": 1,
+        "pending": 0,
+        "battery_mv": 0,
+        "adv_flags": 0
+      },
+      "hex": "010000000000"
+    },
+    {
+      "name": "pending_time_set",
+      "fields": {
+        "protocol_version": 1,
+        "pending": 1440,
+        "battery_mv": 3712,
+        "adv_flags": 1
+      },
+      "hex": "01a005800e01"
+    },
+    {
+      "name": "saturated_with_drops",
+      "fields": {
+        "protocol_version": 1,
+        "pending": 65535,
+        "battery_mv": 3300,
+        "adv_flags": 3
+      },
+      "hex": "01ffffe40c03"
+    }
+  ],
+  "device_info": [
+    {
+      "name": "fresh_device",
+      "fields": {
+        "protocol_version": 1,
+        "record_size": 20,
+        "device_id": "aabbccddeeff",
+        "boot_id": 1,
+        "next_seq": 1,
+        "collected_through": 0,
+        "secured_through": 0,
+        "uptime_s": 12,
+        "unix_time": 0,
+        "dropped": 0,
+        "battery_mv": 0,
+        "capacity": 4096,
+        "fw_version": "sensor-0.3.0"
+      },
+      "hex": "0114aabbccddeeff01000100000000000000000000000c00000000000000000000000000001073656e736f722d302e332e3000000000"
+    },
+    {
+      "name": "mid_life_device",
+      "fields": {
+        "protocol_version": 1,
+        "record_size": 20,
+        "device_id": "aabbccddeeff",
+        "boot_id": 7,
+        "next_seq": 20001,
+        "collected_through": 19000,
+        "secured_through": 18000,
+        "uptime_s": 259200,
+        "unix_time": 1790121600,
+        "dropped": 25,
+        "battery_mv": 3650,
+        "capacity": 65535,
+        "fw_version": "sensor-0.3.0-rc1"
+      },
+      "hex": "0114aabbccddeeff0700214e0000384a00005046000080f403008016b36a19000000420effff73656e736f722d302e332e302d726331"
+    }
+  ],
+  "status": [
+    {
+      "name": "open_ok",
+      "fields": {
+        "opcode": 1,
+        "result": 0,
+        "seq": 42
+      },
+      "hex": "01002a000000"
+    },
+    {
+      "name": "read_no_session",
+      "fields": {
+        "opcode": 3,
+        "result": 1,
+        "seq": 0
+      },
+      "hex": "030100000000"
+    },
+    {
+      "name": "ack_out_of_range",
+      "fields": {
+        "opcode": 5,
+        "result": 3,
+        "seq": 41
+      },
+      "hex": "050329000000"
+    },
+    {
+      "name": "unknown_opcode_bad_argument",
+      "fields": {
+        "opcode": 127,
+        "result": 2,
+        "seq": 0
+      },
+      "hex": "7f0200000000"
+    }
+  ],
+  "commands": [
+    {
+      "name": "open_session",
+      "command": {
+        "name": "OPEN_SESSION",
+        "session_id": "7a1c2e3f12344bcd9ef00123456789ab",
+        "opcode": 1
+      },
+      "hex": "017a1c2e3f12344bcd9ef00123456789ab"
+    },
+    {
+      "name": "set_time",
+      "command": {
+        "name": "SET_TIME",
+        "unix_time": 1790121600,
+        "opcode": 2
+      },
+      "hex": "028016b36a"
+    },
+    {
+      "name": "read_from_all",
+      "command": {
+        "name": "READ_FROM",
+        "seq": 1,
+        "max_records": 0,
+        "opcode": 3
+      },
+      "hex": "03010000000000"
+    },
+    {
+      "name": "read_from_window",
+      "command": {
+        "name": "READ_FROM",
+        "seq": 4712,
+        "max_records": 200,
+        "opcode": 3
+      },
+      "hex": "0368120000c800"
+    },
+    {
+      "name": "ack_collected",
+      "command": {
+        "name": "ACK_COLLECTED",
+        "through_seq": 4711,
+        "opcode": 4
+      },
+      "hex": "0467120000"
+    },
+    {
+      "name": "ack_secured",
+      "command": {
+        "name": "ACK_SECURED",
+        "through_seq": 4000,
+        "opcode": 5
+      },
+      "hex": "05a00f0000"
+    },
+    {
+      "name": "close_session",
+      "command": {
+        "name": "CLOSE_SESSION",
+        "opcode": 6
+      },
+      "hex": "06"
+    }
+  ],
+  "invalid_commands": [
+    {
+      "name": "empty",
+      "hex": "",
+      "error": "bad_length"
+    },
+    {
+      "name": "set_time_short",
+      "hex": "020100",
+      "error": "bad_length"
+    },
+    {
+      "name": "close_session_trailing_byte",
+      "hex": "0600",
+      "error": "bad_length"
+    },
+    {
+      "name": "unknown_opcode",
+      "hex": "7f00000000",
+      "error": "unknown_opcode"
+    }
+  ],
+  "chunks": [
+    {
+      "name": "two_records_not_last",
+      "first_seq": 1,
+      "flags": 0,
+      "records": [
+        "01010000010000003c0000000020a3470100ee46",
+        "01010000020000007800000000e4a247010068d8"
+      ],
+      "hex": "010000000200d43501010000010000003c0000000020a3470100ee4601010000020000007800000000e4a247010068d8",
+      "header": {
+        "first_seq": 1,
+        "count": 2,
+        "flags": 0,
+        "crc": 13780
+      }
+    },
+    {
+      "name": "one_record_last",
+      "first_seq": 4711,
+      "flags": 1,
+      "records": [
+        "0101030067120000100e0000000080bf010017cc"
+      ],
+      "hex": "671200000101cbb30101030067120000100e0000000080bf010017cc",
+      "header": {
+        "first_seq": 4711,
+        "count": 1,
+        "flags": 1,
+        "crc": 46027
+      }
+    },
+    {
+      "name": "empty_last",
+      "first_seq": 20001,
+      "flags": 1,
+      "records": [],
+      "hex": "214e00000001ffff",
+      "header": {
+        "first_seq": 20001,
+        "count": 0,
+        "flags": 1,
+        "crc": 65535
+      }
+    }
+  ]
+}
