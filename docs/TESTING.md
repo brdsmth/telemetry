@@ -114,12 +114,13 @@ version and `PowerPolicy` values used; they are not automated.
 
 ## CI layout
 
-`.github/workflows/ci.yml` runs path-filtered jobs by scope:
+Each scope has its own workflow file under `.github/workflows/` with a path
+filter, so a firmware change does not run the app job:
 
 | Job        | Triggers on changes under          | Runs                                        |
 |------------|------------------------------------|---------------------------------------------|
 | `schema`   | `schema/`                          | regenerate vectors, `git diff --exit-code`  |
-| `firmware` | `sensor/`, `lib/`, `schema/`       | `pio test -e native`, `pio run` every env   |
+| `firmware` | `sensor/`, `gateway/`, `lib/`, `schema/` | `pio test -e native`, `pio run` per firmware |
 | `api`      | `api/`, `schema/`                  | `go vet`, `go test` with a Postgres service |
 | `app`      | `app/`, `schema/`                  | `tsc --noEmit`, lint, Jest                  |
 | `e2e`      | nightly schedule, manual           | `make e2e`                                  |
