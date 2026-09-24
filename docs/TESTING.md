@@ -94,11 +94,12 @@ demand, not on every push.
 
 ### Tier 6: hardware in the loop
 
-`scripts/hil/smoke.py` flashes the attached board, captures serial for a fixed
-window, asserts the boot markers and firmware version, and uses `bleak` on the
-host to confirm the sensor is advertising with the expected service UUID and
-manufacturer data. Manual or nightly. If the serial port is busy the script
-says so and exits rather than fighting a monitor for it.
+`scripts/hil/serial_capture.py` resets the attached board and captures its
+serial output for a fixed window with timestamps, refusing to attach if another
+process holds the port. It is the building block; `scripts/hil/smoke.py` will
+flash, capture, assert the boot markers and firmware version, and use `bleak`
+on the host to confirm the sensor is advertising with the expected service
+UUID and manufacturer data. Manual or nightly.
 
 Power measurements are recorded by hand in `docs/power.md` with the firmware
 version and `PowerPolicy` values used; they are not automated.
