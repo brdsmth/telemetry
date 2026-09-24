@@ -125,14 +125,19 @@ it and the fallback is the ESP-IDF framework.
 Layered so the UI is thin and the sync logic is testable without a device.
 
 ```
-app/src/protocol/   record and command codec (pure TypeScript, vector tested)
-app/src/transport/  SensorTransport interface: BlePlxTransport, FakeTransport,
-                    TcpTransport (dev only, talks to the simulator)
-app/src/store/      SQLite repositories: sensors, readings, sessions, batches
+app/src/protocol/   record, advertising, command, status and chunk codecs
+                    (pure TypeScript, vector tested)
+app/src/transport/  SensorTransport interface: BlePlxTransport (radio),
+                    FakeSensor + FakeTransport (in-memory sensor for tests
+                    and development; a TCP transport to the simulator later)
+app/src/store/      Repository interface: SqliteRepository, MemoryRepository
 app/src/sync/       CollectionService (BLE side), UploadService (HTTP side)
-app/src/net/        API client, connectivity watcher
-app/app/            expo-router screens that render store state only
+app/src/net/        ApiClient for the batch endpoint
+app/src/platform/   getServices() wires the real stack once
+app/app/            expo-router screens that call the services only
 ```
+
+The app needs a development build; Expo Go cannot load the BLE module.
 
 Collection: scan filtered by the telemetry service UUID, connect, set time,
 read device info, pull from the phone's cursor for that device, store, ack
@@ -232,8 +237,8 @@ Makefile        root task runner: make test fans out to every component
 2. **Sensor.** Ring store on LittleFS with NVS cursor, sync session over
    NimBLE, set-time command, `field` build with deep sleep, simulator build.
 3. **App.** Transport interface with fake and BLE implementations, SQLite
-   store, collection service, one screen showing pending / collected / secured
-   per sensor.
+   store, collection and upload services, one screen showing pending /
+   collected / secured per sensor. *(implemented; awaiting a device run)*
 4. **Server and upload.** Batch endpoint with idempotency, connection pool,
    migrations, upload service with connectivity trigger, server ack flowing
    back to the sensor on the next visit.

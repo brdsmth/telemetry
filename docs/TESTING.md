@@ -62,9 +62,12 @@ Whole subsystems run together on the host with fake peripherals.
   `FakeTransport`. Scenarios: full pull from an empty cursor, resume after
   disconnect mid-chunk, ack frees slots, ring wraps and reports drops, set-time
   back-fills.
-- **App:** `CollectionService` + `FakeTransport` + in-memory repositories;
-  `UploadService` + a fake API client. Scenarios mirror the firmware ones from
-  the other side, plus retry after a failed upload and duplicate suppression.
+- **App:** `CollectionService` + `FakeTransport` + `MemoryRepository`;
+  `UploadService` + `FakeApiClient`. Scenarios: first and repeat visits, a wiped
+  phone, the secured ack reaching the sensor, gaps from corrupt slots, dropped
+  chunks, link loss, rejected records, retry after a 5xx, and the full
+  collect, upload, revisit loop. `FakeSensor` itself is tested against the
+  same behaviours as the firmware's `SyncSession`.
 - **API:** handlers with `httptest` against a real Postgres started by
   testcontainers or by `docker compose`. Scenarios: idempotent re-post of a
   batch, partial overlap, malformed record, ack ranges.
