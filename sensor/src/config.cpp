@@ -1,7 +1,7 @@
 #include "config.h"
 
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 #include "logger.h"
 
@@ -16,14 +16,14 @@ static unsigned long intervalForMode(const String& mode) {
 }
 
 bool loadConfig(Config& cfg) {
-    logln("-----> Loading configuration from SPIFFS...");
+    logln("-----> Loading configuration from LittleFS...");
 
-    if (!SPIFFS.exists(kConfigPath)) {
+    if (!LittleFS.exists(kConfigPath)) {
         logln("-----> WARNING: config.json not found, using defaults");
         return false;
     }
 
-    File file = SPIFFS.open(kConfigPath, FILE_READ);
+    File file = LittleFS.open(kConfigPath, FILE_READ);
     if (!file) {
         logln("-----> ERROR: Could not open config.json");
         return false;
@@ -52,6 +52,7 @@ bool loadConfig(Config& cfg) {
     cfg.supplyMillivolts    = doc["supply_millivolts"]     | cfg.supplyMillivolts;
     cfg.seriesResistorOhms  = doc["series_resistor_ohms"]  | cfg.seriesResistorOhms;
     cfg.adcSamples          = doc["adc_samples"]           | cfg.adcSamples;
+    cfg.ringSlots           = doc["ring_slots"]            | cfg.ringSlots;
 
     logln("-----> Configuration loaded successfully");
     return true;
@@ -75,5 +76,6 @@ void printConfig(const Config& cfg) {
     logln("-----> Supply: " + String(cfg.supplyMillivolts, 0) + "mV");
     logln("-----> Series Resistor: " + String(cfg.seriesResistorOhms, 0) + " ohm");
     logln("-----> ADC Samples: " + String(cfg.adcSamples));
+    logln("-----> Ring Slots: " + String(cfg.ringSlots));
     logln("=== END CONFIGURATION ===\n");
 }

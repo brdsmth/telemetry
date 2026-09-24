@@ -11,5 +11,6 @@
   "depth_cm": 0,
   "supply_millivolts": 3300,
   "series_resistor_ohms": 100000,
-  "adc_samples": 16
+  "adc_samples": 16,
+  "ring_slots": 8192
 }
