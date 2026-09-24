@@ -96,10 +96,15 @@ demand, not on every push.
 
 `scripts/hil/serial_capture.py` resets the attached board and captures its
 serial output for a fixed window with timestamps, refusing to attach if another
-process holds the port. It is the building block; `scripts/hil/smoke.py` will
-flash, capture, assert the boot markers and firmware version, and use `bleak`
-on the host to confirm the sensor is advertising with the expected service
-UUID and manufacturer data. Manual or nightly.
+process holds the port. `scripts/hil/ble_probe.py` is the reference BLE
+central: it scans for the service UUID, decodes the advertisement, connects,
+opens a session, sets the time, pulls records with CRC and seq checks, and
+acknowledges. Both are building blocks; `scripts/hil/smoke.py` will chain
+them and assert. Manual or nightly.
+
+macOS only lets a process use Bluetooth after the user grants it in a system
+prompt, so run `ble_probe.py` from your own terminal the first time; a
+sandboxed or non-interactive shell hangs waiting for CoreBluetooth to power on.
 
 Power measurements are recorded by hand in `docs/power.md` with the firmware
 version and `PowerPolicy` values used; they are not automated.
