@@ -31,10 +31,20 @@ npm install
 npx expo run:ios        # or: npx expo run:android
 ```
 
-Then `npx expo start` reloads JavaScript into that build. On a simulator or on
-web there is no Bluetooth; turn on "Use fake sensors" in Settings to drive
-the whole pipeline against two in-memory sensors, including uploads to the
-real API.
+Then `npx expo start` reloads JavaScript into that build. Simulators and web
+have no Bluetooth and default to two in-memory fake sensors that speak the
+protocol, so the whole pipeline, including uploads to the real API, can be
+exercised without hardware; Settings can switch either way.
+
+SDK 57 needs **Xcode 26.4 or newer** for a local iOS build; Xcode 26.3 fails
+inside `expo-modules-jsi` (expo/expo#50067). Web needs no Xcode:
+
+```bash
+npx expo start --web --port 8081     # then open http://localhost:8081
+```
+
+Install `watchman` (`brew install watchman`); without it Metro's file
+watcher misses edits and serves stale bundles until restarted with `--clear`.
 
 The API URL defaults to the Railway deployment and can be changed in
 Settings.
@@ -42,10 +52,15 @@ Settings.
 ## Tests
 
 ```bash
-npm test          # Jest: codec vectors, fake sensor, collection and upload
+npm test          # Jest: codec vectors, fake sensor, api client, collection and upload
 npm run typecheck # tsc --noEmit
 npx expo-doctor   # dependency and config health
+maestro test maestro/pipeline.yaml   # UI smoke on a running simulator build
 ```
+
+The Maestro flow scans, collects, uploads and revisits the fake sensors on a
+development build. The same sequence was verified on the web target by
+driving the page in a headless browser against the Railway API.
 
 `npm run lint` is currently broken by an eslint import resolver problem that
 predates this code; CI runs the type check and the tests.
