@@ -172,9 +172,9 @@ The API and Postgres are hosted on Railway. The container is defined by
 `api/Dockerfile` and the service settings by `api/railway.json`, so the deploy
 configuration is versioned next to the code it deploys.
 
-The AWS API Gateway → EventBridge → SQS → Lambda path under `infra/` is a
-leftover from the cellular gateway experiments and discards data. It is not
-the backend. See [ADR 0003](./adr/0003-go-api-is-system-of-record.md).
+An earlier AWS API Gateway → EventBridge → SQS → Lambda experiment from the
+cellular gateway work has been removed; it discarded data and never shared a
+schema with the API. See [ADR 0003](./adr/0003-go-api-is-system-of-record.md).
 
 ### 3.4 Gateway (`gateway/`)
 
@@ -209,7 +209,6 @@ sensor/         sensor firmware: app wiring, HAL, ESP32 platform, tests
 gateway/        cellular gateway firmware
 app/            Expo mobile app
 api/            Go server
-infra/          legacy AWS experiment, slated for removal (Railway config lives in api/)
 docs/           this document, TESTING.md, ADRs
 scripts/        developer tooling: serial capture, BLE probe, HIL smoke
 .github/        CI
