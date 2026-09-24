@@ -11,6 +11,7 @@ struct Config;
 
 struct Diagnostics {
     const Config* config = nullptr;
+    bool          bleConnected = false;  // updated by the main loop
 
     bool          hasReading    = false;
     Measurement   lastReading;

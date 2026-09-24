@@ -5,7 +5,6 @@
 #include <WiFi.h>
 
 #include "config.h"
-#include "net/BleLink.h"
 #include "system/Clock.h"
 #include "version.h"
 
@@ -64,7 +63,7 @@ String Diagnostics::toJson() const {
 
     JsonObject ble = doc.createNestedObject("ble");
     ble["enabled"]   = config ? config->bleEnabled : false;
-    ble["connected"] = ble_link::isConnected();
+    ble["connected"] = bleConnected;
 
     if (config) {
         JsonObject cfg = doc.createNestedObject("config");
