@@ -43,9 +43,11 @@ export interface ApiClient {
 }
 
 export class FetchApiClient implements ApiClient {
+  // Wrapped in an arrow so `fetch` runs with its own `this`; browsers throw
+  // "Illegal invocation" when it is called as a method of another object.
   constructor(
     private readonly baseUrl: string,
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init),
   ) {}
 
   async postBatch(envelope: BatchEnvelope): Promise<BatchResponse> {
