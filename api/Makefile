@@ -2,18 +2,17 @@ APP_NAME := api
 BUILD_DIR := build
 
 .PHONY: all run build clean test vet
-.PHONY: setup
 
 all: build
 
 run:
 	@echo "🔧 Running $(APP_NAME)..."
-	go run main.go
+	go run ./cmd/api
 
 build:
 	@echo "📦 Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(APP_NAME) main.go
+	go build -o $(BUILD_DIR)/$(APP_NAME) ./cmd/api
 
 test:
 	go test ./...
