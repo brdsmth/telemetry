@@ -1,0 +1,14 @@
+{
+  "name": "telemetry-core",
+  "version": "0.1.0",
+  "description": "Hardware independent core of the telemetry firmware: record codec, CRC, ring store, sync protocol. Builds on the host.",
+  "keywords": ["telemetry", "ble", "store-and-forward"],
+  "authors": [{ "name": "brdsmth", "email": "brsmith110@gmail.com" }],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "src",
+    "flags": ["-Isrc"]
+  }
+}
