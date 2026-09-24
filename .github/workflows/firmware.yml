@@ -1,0 +1,72 @@
+name: firmware
+
+on:
+  push:
+    paths:
+      - "sensor/**"
+      - "gateway/**"
+      - "lib/**"
+      - "schema/**"
+      - ".github/workflows/firmware.yml"
+  pull_request:
+    paths:
+      - "sensor/**"
+      - "gateway/**"
+      - "lib/**"
+      - "schema/**"
+      - ".github/workflows/firmware.yml"
+
+env:
+  # Bench builds bake WiFi credentials in from the environment; CI only needs
+  # the build to succeed.
+  WIFI_SSID: ci
+  WIFI_PASSWORD: ci
+
+jobs:
+  host-tests:
+    name: host tests (sensor native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('sensor/platformio.ini', 'gateway/platformio.ini') }}
+      - run: pip install --upgrade platformio
+      - run: pio test -e native
+        working-directory: sensor
+
+  sensor-build:
+    name: sensor compiles (esp32dev)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('sensor/platformio.ini', 'gateway/platformio.ini') }}
+      - run: pip install --upgrade platformio
+      - run: pio run -e esp32dev
+        working-directory: sensor
+
+  gateway-build:
+    name: gateway compiles (esp32s3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('sensor/platformio.ini', 'gateway/platformio.ini') }}
+      - run: pip install --upgrade platformio
+      - run: pio run
+        working-directory: gateway

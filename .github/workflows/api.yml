@@ -1,0 +1,36 @@
+name: api
+
+on:
+  push:
+    paths: ["api/**", "schema/**", ".github/workflows/api.yml"]
+  pull_request:
+    paths: ["api/**", "schema/**", ".github/workflows/api.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: telemetry
+          POSTGRES_PASSWORD: telemetry
+          POSTGRES_DB: telemetry
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U telemetry"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://telemetry:telemetry@localhost:5432/telemetry?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - run: go vet ./...
+        working-directory: api
+      - run: go test ./...
+        working-directory: api
