@@ -1,50 +1,60 @@
-# Welcome to your Expo app 👋
+# Mobile app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo / React Native app that carries readings from sensors to the server:
+scan for sensors over BLE, pull what they hold, store it on the phone,
+upload when online, and pass the server's confirmation back to the sensor on
+the next visit. See [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) §3.2.
 
-## Get started
+## Layout
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+src/protocol/    record, advertising, command, status and chunk codecs
+                 (tested against ../schema/vectors)
+src/transport/   SensorTransport interface; BlePlxTransport (real radio),
+                 FakeSensor + FakeTransport (in-memory sensor for tests and dev)
+src/store/       Repository interface; SqliteRepository, MemoryRepository
+src/net/         ApiClient for POST /v1/batches; FetchApiClient, FakeApiClient
+src/sync/        CollectionService (one BLE visit), UploadService (batches)
+src/platform/    wiring: getServices() builds the real stack once
+app/(tabs)/      two screens: Sensors, Settings
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Screens only call `getServices()`. Nothing in `src/` imports React.
 
-## Learn more
+## Running
 
-To learn more about developing your project with Expo, look at the following resources:
+BLE is a native module, so **Expo Go cannot run this app**. Use a development
+build:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm install
+npx expo run:ios        # or: npx expo run:android
+```
 
-## Join the community
+Then `npx expo start` reloads JavaScript into that build. On a simulator or on
+web there is no Bluetooth; turn on "Use fake sensors" in Settings to drive
+the whole pipeline against two in-memory sensors, including uploads to the
+real API.
 
-Join our community of developers creating universal apps.
+The API URL defaults to the Railway deployment and can be changed in
+Settings.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Tests
+
+```bash
+npm test          # Jest: codec vectors, fake sensor, collection and upload
+npm run typecheck # tsc --noEmit
+npx expo-doctor   # dependency and config health
+```
+
+`npm run lint` is currently broken by an eslint import resolver problem that
+predates this code; CI runs the type check and the tests.
+
+## Notes
+
+- Bluetooth permissions are declared in `app.json`; iOS asks on first scan.
+- A visit is one BLE connection: open session, `SET_TIME`, `ACK_SECURED` if
+  the server confirmed anything since last time, `READ_FROM` windows until
+  the sensor has nothing more, `ACK_COLLECTED`, close.
+- Uploads are one batch per session so the server can back-fill times for
+  records the sensor stamped with uptime.
