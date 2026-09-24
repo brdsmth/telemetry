@@ -161,6 +161,11 @@ duplicates, and returns the acknowledged sequence ranges. Idempotency lets the
 phone retry safely. Sessions and batches are stored as tables, which is what
 makes tracing a query rather than a log search.
 
+A minimal read-only admin page at `/admin` shows what the server holds:
+devices with their seq ranges, readings with their time source, batches,
+sessions and the bench feed. It exists to observe the pipeline, not to
+manage anything, and stays deliberately plain.
+
 The API and Postgres are hosted on Railway. The container is defined by
 `api/Dockerfile` and the service settings by `api/railway.json`, so the deploy
 configuration is versioned next to the code it deploys.
