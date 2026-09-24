@@ -235,9 +235,12 @@ Response `200`:
 ```
 
 A record whose `(device_id, seq)` already exists is acknowledged, not
-rejected. `acked` ranges cover every record the server holds after this
-request, so the phone can advance `secured_through` to the highest contiguous
-`to_seq` from the sensor's `secured_through`.
+rejected. `acked` ranges cover every record the server holds within the seq
+span of this batch (lowest to highest seq sent), including records it already
+held, so a retried batch gets the same answer. The phone tracks per-record
+upload state and advances the sensor's `secured_through` to the highest seq
+that is contiguous from the sensor's current `secured_through`. Batches may
+hold up to 5000 records.
 
 `4xx` means the envelope itself is malformed and nothing was stored. `5xx`
 means retry the whole batch; idempotency makes that safe.
