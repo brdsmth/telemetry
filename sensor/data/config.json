@@ -1,7 +1,7 @@
 {
   "wifi_enabled": true,
   "wifi_http_enabled": true,
-  "wifi_http_url": "http://192.168.1.37:8080/ingest",
+  "wifi_http_url": "https://api-production-2e52.up.railway.app/ingest",
   "ble_enabled": true,
   "web_server_enabled": true,
   "data_logging_enabled": true,
@@ -11,5 +11,6 @@
   "depth_cm": 0,
   "supply_millivolts": 3300,
   "series_resistor_ohms": 100000,
-  "adc_samples": 16
+  "adc_samples": 16,
+  "ring_slots": 8192
 }
