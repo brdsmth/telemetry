@@ -77,9 +77,11 @@ Rules:
   compiles on the host. This is what makes it testable.
 - The core never includes `Arduino.h` and never uses Arduino `String`. It uses
   fixed buffers and `std::` types.
-- The HAL is a handful of small abstract classes: probe, clock, block storage,
-  key-value store, transport. Keep it minimal. Add an interface only when a
-  second implementation exists or a test needs one.
+- Interfaces are small abstract classes and live next to the code that needs
+  them. The core defines the ones it depends on (slot storage, cursor store,
+  system services) inside `lib/telemetry-core`; `sensor/src/hal/` holds the
+  peripheral-facing ones (probe, power). Add an interface only when a second
+  implementation exists or a test needs one.
 - Build variants are PlatformIO environments, not runtime flags. `field` has
   BLE, the store, and deep sleep. `bench` adds WiFi, NTP, the web portal, and
   verbose serial. Runtime flags do not shrink the binary and make radio
