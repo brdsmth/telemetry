@@ -1,6 +1,6 @@
 #include "DataLog.h"
 
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 #include "logger.h"
 
@@ -8,27 +8,27 @@ DataLog::DataLog(const char* path, const char* header)
 : path_(path), header_(header) {}
 
 bool DataLog::begin() {
-    logln("-----> Initializing SPIFFS...");
+    logln("-----> Initializing LittleFS...");
 
-    if (!SPIFFS.begin(true)) {
-        logln("-----> ERROR: SPIFFS mount failed!");
+    if (!LittleFS.begin(true)) {
+        logln("-----> ERROR: LittleFS mount failed!");
         return false;
     }
 
-    size_t totalBytes = SPIFFS.totalBytes();
-    size_t usedBytes = SPIFFS.usedBytes();
-    logln("-----> SPIFFS mounted successfully");
+    size_t totalBytes = LittleFS.totalBytes();
+    size_t usedBytes = LittleFS.usedBytes();
+    logln("-----> LittleFS mounted successfully");
     logln("-----> Total: " + String(totalBytes) + " bytes");
     logln("-----> Used: " + String(usedBytes) + " bytes");
     logln("-----> Free: " + String(totalBytes - usedBytes) + " bytes");
 
-    if (SPIFFS.exists(path_)) {
+    if (LittleFS.exists(path_)) {
         if (headerMatches()) {
             logln("-----> Log file already exists");
             return true;
         }
         logln("-----> Log file has a different header, recreating it");
-        SPIFFS.remove(path_);
+        LittleFS.remove(path_);
     }
 
     logln("-----> Creating new log file...");
@@ -41,7 +41,7 @@ bool DataLog::begin() {
 }
 
 bool DataLog::append(const String& line) {
-    File file = SPIFFS.open(path_, FILE_APPEND);
+    File file = LittleFS.open(path_, FILE_APPEND);
     if (!file) {
         logln("-----> ERROR: Could not open log file for writing!");
         return false;
@@ -53,18 +53,18 @@ bool DataLog::append(const String& line) {
 }
 
 bool DataLog::clear() {
-    if (SPIFFS.exists(path_)) {
-        SPIFFS.remove(path_);
+    if (LittleFS.exists(path_)) {
+        LittleFS.remove(path_);
     }
     return writeHeader();
 }
 
 bool DataLog::exists() const {
-    return SPIFFS.exists(path_);
+    return LittleFS.exists(path_);
 }
 
 size_t DataLog::size() const {
-    File file = SPIFFS.open(path_, FILE_READ);
+    File file = LittleFS.open(path_, FILE_READ);
     if (!file) return 0;
     size_t s = file.size();
     file.close();
@@ -72,11 +72,11 @@ size_t DataLog::size() const {
 }
 
 File DataLog::openForRead() const {
-    return SPIFFS.open(path_, FILE_READ);
+    return LittleFS.open(path_, FILE_READ);
 }
 
 bool DataLog::writeHeader() {
-    File file = SPIFFS.open(path_, FILE_WRITE);
+    File file = LittleFS.open(path_, FILE_WRITE);
     if (!file) return false;
     file.println(header_);
     file.close();
@@ -84,7 +84,7 @@ bool DataLog::writeHeader() {
 }
 
 bool DataLog::headerMatches() const {
-    File file = SPIFFS.open(path_, FILE_READ);
+    File file = LittleFS.open(path_, FILE_READ);
     if (!file) return false;
     String first = file.readStringUntil('\n');
     file.close();

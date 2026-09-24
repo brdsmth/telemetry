@@ -1,6 +1,6 @@
 // DataLog.h
 //
-// Append-only CSV log on SPIFFS.
+// Append-only CSV log on LittleFS.
 #pragma once
 #include <Arduino.h>
 #include <FS.h>
@@ -9,7 +9,7 @@ class DataLog {
 public:
     DataLog(const char* path, const char* header);
 
-    // Mounts SPIFFS (formatting on first use) and creates the file with its
+    // Mounts LittleFS (formatting on first use) and creates the file with its
     // header if it does not exist yet. An existing file whose first line does
     // not match the header (older firmware, different columns) is recreated.
     bool begin();

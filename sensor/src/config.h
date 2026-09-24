@@ -1,6 +1,6 @@
 // config.h
 //
-// Runtime configuration loaded from /config.json on SPIFFS (see data/config.json).
+// Runtime configuration loaded from /config.json on LittleFS (see data/config.json).
 #pragma once
 #include <Arduino.h>
 
@@ -26,6 +26,10 @@ struct Config {
     float  supplyMillivolts    = 3300.0f;
     float  seriesResistorOhms  = 100000.0f;
     int    adcSamples          = 16;
+
+    // Record ring on flash: slots x 20 bytes. 8192 slots is 160 KB, about
+    // 5.7 days at one reading a minute.
+    uint32_t ringSlots         = 8192;
 };
 
 constexpr unsigned long kLiveIntervalMs        = 60000;
