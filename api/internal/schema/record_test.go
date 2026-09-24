@@ -9,9 +9,9 @@ import (
 )
 
 type vectorFile struct {
-	Format string `json:"format"`
-	Version int   `json:"version"`
-	Size    int   `json:"size"`
+	Format  string `json:"format"`
+	Version int    `json:"version"`
+	Size    int    `json:"size"`
 	CRC     struct {
 		CheckInput string `json:"check_input"`
 		Check      string `json:"check"`
