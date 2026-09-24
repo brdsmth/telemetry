@@ -1,0 +1,42 @@
+# UI smoke of the whole phone-side pipeline on a simulator: fake sensors are
+# collected into SQLite and uploaded to the configured API.
+#
+#   maestro test app/maestro/pipeline.yaml
+#
+# Needs the development build running on a simulator (npx expo run:ios) with
+# fake sensors active, which is the simulator default.
+appId: com.telemetry.mobile
+---
+- launchApp:
+    clearState: false
+- assertVisible: "Sensors"
+- assertVisible: "Using fake sensors"
+- tapOn: "Scan"
+- extendedWaitUntil:
+    visible: "2 sensors in range"
+    timeout: 15000
+- assertVisible: "TLM-0000A1"
+- assertVisible: "TLM-0000B2"
+- tapOn: "Collect all"
+- extendedWaitUntil:
+    visible: "TLM-0000A1: 90"
+    timeout: 30000
+- assertVisible: "TLM-0000B2: 30"
+- assertVisible: "Known sensors"
+- tapOn: "Upload"
+- extendedWaitUntil:
+    visible:
+      text: ".*uploaded, 0 rejected, 0 failed.*"
+    timeout: 60000
+- takeScreenshot: pipeline-after-upload
+# A second collection passes the server's ack on to the sensors.
+- tapOn: "Scan"
+- extendedWaitUntil:
+    visible: "2 sensors in range"
+    timeout: 15000
+- tapOn: "Collect all"
+- extendedWaitUntil:
+    visible:
+      text: "TLM-0000A1: .*"
+    timeout: 30000
+- takeScreenshot: pipeline-after-revisit
