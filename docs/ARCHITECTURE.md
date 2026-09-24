@@ -161,6 +161,10 @@ duplicates, and returns the acknowledged sequence ranges. Idempotency lets the
 phone retry safely. Sessions and batches are stored as tables, which is what
 makes tracing a query rather than a log search.
 
+The API and Postgres are hosted on Railway. The container is defined by
+`api/Dockerfile` and the service settings by `api/railway.json`, so the deploy
+configuration is versioned next to the code it deploys.
+
 The AWS API Gateway → EventBridge → SQS → Lambda path under `infra/` is a
 leftover from the cellular gateway experiments and discards data. It is not
 the backend. See [ADR 0003](./adr/0003-go-api-is-system-of-record.md).
@@ -198,7 +202,7 @@ sensor/         sensor firmware: app wiring, HAL, ESP32 platform, tests
 gateway/        cellular gateway firmware
 app/            Expo mobile app
 api/            Go server
-infra/          deployment (to be reduced to what the Go API needs)
+infra/          legacy AWS experiment, slated for removal (Railway config lives in api/)
 docs/           this document, TESTING.md, ADRs
 scripts/        developer tooling: serial capture, BLE probe, HIL smoke
 .github/        CI

@@ -18,9 +18,11 @@ endpoint with idempotency on `(device_id, seq)`, sessions and batches tables,
 a connection pool, and migrations. The gateway, when it returns, posts the same
 batch envelope to the same endpoint.
 
-The AWS event pipeline is not extended. `infra/` is reduced to whatever is
-needed to run the Go API and Postgres. If a managed ingress is wanted later it
-sits in front of the Go API rather than beside it.
+The Go API and its Postgres run on Railway, in the `telemetry` project, with
+the API built from `api/Dockerfile` and configured by `api/railway.json`. The
+AWS event pipeline is not extended and `infra/` is slated for removal once
+nothing references it. If a managed ingress is wanted later it sits in front
+of the Go API rather than beside it.
 
 ## Alternatives considered
 
@@ -34,6 +36,8 @@ sits in front of the Go API rather than beside it.
 
 - One schema, one set of integration tests, one place to add tracing.
 - `infra/index.ts` with its hardcoded account and resource ids is slated for
-  removal or rewrite.
+  removal.
+- Deployment configuration lives with the service (`api/railway.json`) rather
+  than in a separate infrastructure tree.
 - The gateway's `Telemetry` struct is replaced by the shared record format
   when that work resumes.
