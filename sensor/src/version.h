@@ -1,2 +1,2 @@
 #pragma once
-#define FIRMWARE_VERSION "sensor-0.2.0"
+#define FIRMWARE_VERSION "sensor-0.3.0"
