@@ -43,6 +43,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", ingest.Healthz(st))
 	mux.HandleFunc("/ingest", ingest.Legacy(st, logger))
+	mux.HandleFunc("/v1/batches", ingest.Batches(st, logger))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
