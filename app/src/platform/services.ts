@@ -1,5 +1,6 @@
 // Wires the real implementations together once per app run. Screens call
 // getServices() and never construct transports or repositories themselves.
+import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 
@@ -57,9 +58,11 @@ async function build(): Promise<Services> {
   };
 
   const apiUrl = (await repo.getSetting(API_URL_SETTING)) ?? DEFAULT_API_URL;
-  // The web target has no BLE; fall back to fake sensors there, or when the
-  // setting asks for them (simulator development).
-  const usingFakeSensors = Platform.OS === 'web' || (await repo.getSetting(FAKE_SENSORS_SETTING)) === 'true';
+  // Web and simulators have no BLE, so they default to fake sensors; a real
+  // device defaults to the radio. The setting, once saved, wins either way.
+  const setting = await repo.getSetting(FAKE_SENSORS_SETTING);
+  const noRadio = Platform.OS === 'web' || Constants.isDevice === false;
+  const usingFakeSensors = setting === null ? noRadio : setting === 'true';
   const transport = usingFakeSensors ? demoTransport() : await realTransport();
   const api = new FetchApiClient(apiUrl);
 
