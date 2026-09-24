@@ -58,6 +58,35 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
+// ensureSchema creates the tables the API writes to. Idempotent, so it runs
+// on every start; a migrations tool replaces this once there is more than one
+// table to manage.
+func ensureSchema(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS incoming_raw (
+			id        SERIAL PRIMARY KEY,
+			node      TEXT NOT NULL,
+			type      TEXT NOT NULL,
+			depth     INT NOT NULL,
+			firmware  TEXT NOT NULL,
+			value     DOUBLE PRECISION NOT NULL,
+			timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`)
+	return err
+}
+
+// healthzHandler answers 200 when the database is reachable.
+func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := db.Ping(ctx); err != nil {
+		http.Error(w, "db unreachable", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+}
+
 // Function to print all available network interfaces
 func printNetworkInterfaces() {
 	fmt.Println("=== Available Network Interfaces ===")
@@ -106,6 +135,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := ensureSchema(context.Background(), db); err != nil {
+		log.Fatalf("schema: %v", err)
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("---> /")
 		w.WriteHeader(http.StatusOK)
@@ -113,12 +146,12 @@ func main() {
 	})
 	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("---> /test")
-		
+
 		// Print request method and headers
 		fmt.Printf("Method: %s\n", r.Method)
 		fmt.Printf("Content-Type: %s\n", r.Header.Get("Content-Type"))
 		fmt.Printf("Content-Length: %s\n", r.Header.Get("Content-Length"))
-		
+
 		// Read and print the request body
 		if r.Body != nil {
 			bodyBytes, err := io.ReadAll(r.Body)
@@ -126,7 +159,7 @@ func main() {
 				fmt.Printf("Error reading body: %v\n", err)
 			} else {
 				fmt.Printf("Body: %s\n", string(bodyBytes))
-				
+
 				// Try to parse as JSON and pretty print
 				var jsonData interface{}
 				if err := json.Unmarshal(bodyBytes, &jsonData); err == nil {
@@ -135,19 +168,24 @@ func main() {
 				}
 			}
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("test successful"))
 	})
 
 	// Ingest handler
 	http.HandleFunc("/ingest", ingestHandler)
+	http.HandleFunc("/healthz", healthzHandler)
 
-	port := "8080"
-	
+	// Railway and most hosts inject PORT; fall back for local runs.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	// Print available network interfaces
 	printNetworkInterfaces()
-	
+
 	log.Println("🚀 Ingest server listening on port", port)
 	log.Println("📡 ESP32 should use one of the IP addresses above with port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
