@@ -90,11 +90,13 @@ Rules:
 Subsystems inside the core:
 
 - **Record codec.** Encode and decode the fixed 20-byte record with CRC.
-- **Ring store.** Fixed-size slots on a block device. Operations: append,
-  iterate from a `seq`, acknowledge through a `seq`, report free slots and
-  dropped count. A cursor (`head`, `tail`, `next_seq`) is persisted in NVS.
-  The full-buffer policy is explicit configuration: drop the oldest unacked
-  record or stop sampling.
+- **Ring store.** Fixed-size slots on a block device, `seq % capacity` picks
+  the slot. Operations: append, iterate from a `seq`, acknowledge through a
+  `seq`, report free slots and dropped count. A cursor (`next_seq`,
+  `tail_seq`, the two ack watermarks) is persisted in NVS. The full-buffer
+  policy is explicit configuration: drop the oldest unacked record or stop
+  sampling. Why a ring and not a log or a database is
+  [ADR 0004](./adr/0004-flash-ring-as-the-sensor-store.md).
 - **Sync session.** A state machine that turns commands from the phone into
   chunks of records and applies acknowledgements. It has no BLE dependency.
   A thin transport adapter feeds it bytes.
