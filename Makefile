@@ -3,7 +3,7 @@
 
 .PHONY: test test-firmware test-api test-app vectors check-vectors build-firmware
 
-test: check-vectors test-firmware test-api
+test: check-vectors test-firmware test-api test-app
 
 test-firmware:
 	$(MAKE) -C sensor test
