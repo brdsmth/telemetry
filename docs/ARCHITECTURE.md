@@ -137,7 +137,9 @@ app/src/platform/   getServices() wires the real stack once
 app/app/            expo-router screens that call the services only
 ```
 
-The app needs a development build; Expo Go cannot load the BLE module.
+The app needs a development build; Expo Go cannot load the BLE module. Web
+and simulators default to the fake sensors, and web keeps its repository in
+memory, so the pipeline runs without hardware there.
 
 Collection: scan filtered by the telemetry service UUID, connect, set time,
 read device info, pull from the phone's cursor for that device, store, ack

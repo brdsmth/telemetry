@@ -72,6 +72,16 @@ Whole subsystems run together on the host with fake peripherals.
   testcontainers or by `docker compose`. Scenarios: idempotent re-post of a
   batch, partial overlap, malformed record, ack ranges.
 
+### Tier 3b: the app in a browser
+
+The web target uses the fake sensors and an in-memory repository, so the
+Sensors screen can be driven end to end with no hardware and no Xcode:
+`npx expo start --web`, then scan, collect, upload and revisit, and confirm
+the readings on the API's admin page. This run is what caught the browser's
+"Illegal invocation" on a mis-bound `fetch`, which React Native never
+reports. `app/maestro/pipeline.yaml` does the same on an iOS development
+build once the Xcode version allows one.
+
 ### Tier 4: the simulator
 
 A PlatformIO environment builds `lib/telemetry-core` for the host and links it
