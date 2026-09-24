@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -24,7 +24,7 @@ type SensorPayload struct {
 	Type      string  `json:"type"`
 }
 
-var db *pgx.Conn
+var db *pgxpool.Pool
 
 func ingestHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -100,11 +100,11 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL not set")
 	}
-	db, err = pgx.Connect(context.Background(), dbURL)
+	db, err = pgxpool.New(context.Background(), dbURL)
 	if err != nil {
 		log.Fatalf("Unable to connect to DB: %v", err)
 	}
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("---> /")
